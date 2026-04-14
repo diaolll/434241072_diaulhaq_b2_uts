@@ -1,0 +1,11 @@
+import '../../data/repositories/auth_repository.dart';
+
+class LogoutUseCase {
+  final AuthRepositoryImpl repository;
+
+  LogoutUseCase(this.repository);
+
+  Future<void> call() {
+    return repository.logout();
+  }
+}
