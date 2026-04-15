@@ -19,7 +19,10 @@
       "Bash(pod install:*)",
       "Bash(flutter:*)",
       "Bash(pdftotext \"/Users/diaul/Downloads/Software Requirement Specification Mobile Apps-2.pdf\")",
-      "Bash(python3 -c ':*)"
+      "Bash(python3 -c ':*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(rtk find *)",
+      "Bash(git checkout *)"
     ]
   }
 }

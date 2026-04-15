@@ -35,8 +35,8 @@ func Load() {
         DBUser:         getEnv("DB_USER", "root"),
         DBPassword:     getEnv("DB_PASSWORD", ""),
         DBName:         getEnv("DB_NAME", "e_ticketing"),
-        SupabaseURL:    getEnv("SUPABASE_URL", ""),
-        SupabaseKey:    getEnv("SUPABASE_KEY", ""),
+        SupabaseURL:    getEnv("SUPABASE_URL", "https://twpcgwlmlydmnlxymhrg.supabase.co"),
+        SupabaseKey:    getEnv("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3cGNnd2xtbHlkbW5seHltaHJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxODkyMzUsImV4cCI6MjA5MTc2NTIzNX0.dH7bmZBVe66RF4SNOMfZpHfoEoI43KKvNIl5siowBeE"),
         SupabaseBucket: getEnv("SUPABASE_BUCKET", "ticket-attachments"),
         FirebaseCreds:  getEnv("FIREBASE_CREDENTIALS_FILE", ""),
     }

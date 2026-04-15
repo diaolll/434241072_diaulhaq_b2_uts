@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../data/repositories/auth_repository.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -10,8 +10,6 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  final _authRepo = AuthRepository();
-
   @override
   void initState() {
     super.initState();
@@ -20,9 +18,15 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _checkAuth() async {
     await Future.delayed(const Duration(seconds: 2));
-    final token = await _authRepo.getToken();
+
+    final session = Supabase.instance.client.auth.currentSession;
+
     if (mounted) {
-      context.go(token != null ? '/dashboard' : '/login');
+      if (session != null) {
+        context.go('/dashboard');
+      } else {
+        context.go('/login');
+      }
     }
   }
 
@@ -53,7 +57,7 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Sistem Pelaporan & Monitoring',
+              'Sistem Pelaporan & Monitoring Tiket',
               style: TextStyle(color: Colors.white70, fontSize: 14),
             ),
             const SizedBox(height: 40),

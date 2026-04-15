@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import '../datasources/api_client.dart';
 import '../models/user_model.dart';
 import '../../core/constants/api_constants.dart';
@@ -13,8 +12,8 @@ class AuthRepository {
       'email': email,
       'password': password,
     });
-    final token = res.data['token'];
-    final user = UserModel.fromJson(res.data['user']);
+    final token = res.data['token']?.toString() ?? '';
+    final user = UserModel.fromJson(res.data['user'] ?? {});
     await _storage.write(key: 'auth_token', value: token);
     await _storage.write(key: 'user_role', value: user.role);
     await _storage.write(key: 'user_id', value: user.id);

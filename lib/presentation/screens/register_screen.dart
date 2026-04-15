@@ -22,7 +22,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
     try {
-      await _authRepo.register(_nameCtrl.text, _emailCtrl.text.trim(), _passwordCtrl.text);
+      await _authRepo.register(_nameCtrl.text.trim(), _emailCtrl.text.trim(), _passwordCtrl.text.trim());
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Registrasi berhasil! Silakan login'), backgroundColor: Colors.green),

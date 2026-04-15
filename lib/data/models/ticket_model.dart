@@ -1,3 +1,5 @@
+import 'user_model.dart';
+
 class TicketModel {
   final String id;
   final String ticketNo;
@@ -59,6 +61,37 @@ class TicketModel {
             .map((e) => HistoryModel.fromJson(e))
             .toList(),
       );
+
+  // Computed getters for display
+  String get statusDisplay {
+    switch (status.toLowerCase()) {
+      case 'open':
+        return 'Open';
+      case 'in_progress':
+        return 'In Progress';
+      case 'resolved':
+        return 'Resolved';
+      case 'closed':
+        return 'Closed';
+      default:
+        return status;
+    }
+  }
+
+  String get priorityDisplay {
+    switch (priority.toLowerCase()) {
+      case 'high':
+        return 'High';
+      case 'medium':
+        return 'Medium';
+      case 'low':
+        return 'Low';
+      case 'critical':
+        return 'Critical';
+      default:
+        return priority;
+    }
+  }
 }
 
 class AttachmentModel {
@@ -147,6 +180,3 @@ class HistoryModel {
         user: json['user'] != null ? UserModel.fromJson(json['user']) : null,
       );
 }
-
-// Re-import UserModel here or put in same file
-import 'user_model.dart'; // jika pisah file

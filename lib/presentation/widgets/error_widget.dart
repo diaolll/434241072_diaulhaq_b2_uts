@@ -25,7 +25,7 @@ class ErrorWidget extends StatelessWidget {
               color: AppTheme.errorColor,
             ),
             const SizedBox(height: 16),
-            Text(
+            const Text(
               'Something went wrong',
               style: AppTheme.heading3,
             ),

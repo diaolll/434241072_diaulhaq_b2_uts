@@ -21,13 +21,20 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
+
+    // DEBUG
+    final email = _emailCtrl.text.trim();
+    final password = _passwordCtrl.text.trim();
+    print('🔐 LOGIN ATTEMPT: email="$email" password="$password"');
+
     try {
-      await _authRepo.login(_emailCtrl.text.trim(), _passwordCtrl.text);
+      await _authRepo.login(email, password);
       if (mounted) context.go('/dashboard');
     } catch (e) {
       if (mounted) {
+        print('LOGIN ERROR: $e'); // Debug di console
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Email atau password salah'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -51,7 +58,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppTheme.primary.withOpacity(0.1),
+                      color: AppTheme.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: const Icon(Icons.support_agent, size: 48, color: AppTheme.primary),

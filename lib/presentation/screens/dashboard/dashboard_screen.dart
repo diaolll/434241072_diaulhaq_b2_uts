@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../data/repositories/ticket_repository.dart';
-import '../../../data/repositories/auth_repository.dart';
 import '../../../core/theme/app_theme.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -13,7 +12,6 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final _ticketRepo = TicketRepository();
-  final _authRepo = AuthRepository();
   Map<String, int> _stats = {};
   bool _loading = true;
 

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../../data/models/ticket_model.dart';
-import '../../../data/repositories/ticket_repository.dart';
-import '../../../data/repositories/auth_repository.dart';
-import '../../../core/theme/app_theme.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+import '../../../data/models/ticket_model.dart';
+import '../../../data/repositories/ticket_repository.dart';
+import '../../../core/theme/app_theme.dart';
 
 class TicketDetailScreen extends StatefulWidget {
   final String ticketId;
@@ -17,11 +16,18 @@ class TicketDetailScreen extends StatefulWidget {
 
 class _TicketDetailScreenState extends State<TicketDetailScreen> {
   final _repo = TicketRepository();
-  final _authRepo = AuthRepository();
   final _commentCtrl = TextEditingController();
+  final _picker = ImagePicker();
   TicketModel? _ticket;
   bool _loading = true;
   String? _userRole;
+
+  // Available helpdesk users for assignment
+  final List<Map<String, String>> _helpdeskUsers = [
+    {'id': '1', 'name': 'Helpdesk 1'},
+    {'id': '2', 'name': 'Helpdesk 2'},
+    {'id': '3', 'name': 'Helpdesk 3'},
+  ];
 
   @override
   void initState() {
@@ -32,8 +38,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   Future<void> _load() async {
     try {
       final ticket = await _repo.getTicketById(widget.ticketId);
-      final role = await _authRepo.getRole();
-      setState(() { _ticket = ticket; _userRole = role; _loading = false; });
+      final role = Supabase.instance.client.auth.currentUser?.userMetadata?['role'];
+      setState(() {
+        _ticket = ticket;
+        _userRole = role;
+        _loading = false;
+      });
     } catch (_) {
       setState(() => _loading = false);
     }
@@ -49,41 +59,77 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   }
 
   Future<void> _updateStatus(String status) async {
-    await showDialog(
+    final noteCtrl = TextEditingController();
+    await showDialog<bool>(
       context: context,
-      builder: (ctx) {
-        final noteCtrl = TextEditingController();
-        return AlertDialog(
-          title: const Text('Update Status'),
-          content: TextField(
-            controller: noteCtrl,
-            decoration: const InputDecoration(labelText: 'Catatan (opsional)'),
+      builder: (ctx) => AlertDialog(
+        title: Text('Update ke ${status.replaceAll('_', ' ').toUpperCase()}'),
+        content: TextField(
+          controller: noteCtrl,
+          decoration: const InputDecoration(labelText: 'Catatan (opsional)'),
+          maxLines: 3,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx, true);
+              await _repo.updateStatus(widget.ticketId, status, noteCtrl.text);
+              _load();
+            },
+            child: const Text('Simpan'),
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.pop(ctx);
-                await _repo.updateStatus(widget.ticketId, status, noteCtrl.text);
-                _load();
-              },
-              child: const Text('Simpan'),
-            ),
-          ],
-        );
-      },
+        ],
+      ),
     );
   }
 
+  Future<void> _assignTicket() async {
+    final selectedUserId = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Assign Tiket'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: _helpdeskUsers.map((user) => ListTile(
+            leading: const CircleAvatar(child: Icon(Icons.person)),
+            title: Text(user['name']!),
+            onTap: () => Navigator.pop(ctx, user['id']),
+          )).toList(),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+        ],
+      ),
+    );
+
+    if (selectedUserId != null) {
+      await _repo.assignTicket(widget.ticketId, selectedUserId);
+      _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tiket berhasil diassign')),
+        );
+      }
+    }
+  }
+
   Future<void> _pickAndUpload() async {
-    final picker = ImagePicker();
-    final file = await picker.pickImage(source: ImageSource.gallery);
+    final file = await _picker.pickImage(source: ImageSource.gallery);
     if (file == null) return;
     try {
       await _repo.uploadAttachment(widget.ticketId, file.path, file.name);
       _load();
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal mengupload lampiran'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
+
+  bool get _isAdminOrHelpdesk => _userRole == 'admin' || _userRole == 'helpdesk';
 
   @override
   Widget build(BuildContext context) {
@@ -91,23 +137,29 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     if (_ticket == null) return const Scaffold(body: Center(child: Text('Tiket tidak ditemukan')));
 
     final t = _ticket!;
-    final isStaff = _userRole == 'admin' || _userRole == 'helpdesk';
 
     return Scaffold(
       appBar: AppBar(
         title: Text(t.ticketNo),
         actions: [
-          if (isStaff)
+          if (_isAdminOrHelpdesk) ...[
+            IconButton(
+              icon: const Icon(Icons.person_add),
+              onPressed: _assignTicket,
+              tooltip: 'Assign Tiket',
+            ),
             PopupMenuButton<String>(
               onSelected: _updateStatus,
-              itemBuilder: (_) => ['open', 'in_progress', 'resolved', 'closed']
-                  .map((s) => PopupMenuItem(value: s, child: Text(s.replaceAll('_', ' ').toUpperCase())))
-                  .toList(),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12),
-                child: Row(children: [Text('Update Status'), Icon(Icons.arrow_drop_down)]),
-              ),
+              icon: const Icon(Icons.more_vert),
+              tooltip: 'Update Status',
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: 'open', child: Text('OPEN')),
+                const PopupMenuItem(value: 'in_progress', child: Text('IN PROGRESS')),
+                const PopupMenuItem(value: 'resolved', child: Text('RESOLVED')),
+                const PopupMenuItem(value: 'closed', child: Text('CLOSED')),
+              ],
             ),
+          ],
         ],
       ),
       body: ListView(
@@ -122,28 +174,25 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 children: [
                   Text(t.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
                       _Badge(t.status, AppTheme.statusColor(t.status)),
-                      const SizedBox(width: 8),
                       _Badge(t.priority, AppTheme.priorityColor(t.priority)),
+                      if (t.category != null) _Badge(t.category!, Colors.grey),
                     ],
                   ),
                   const Divider(height: 24),
                   Text(t.description, style: TextStyle(color: Colors.grey[700])),
-                  if (t.category != null) ...[
-                    const SizedBox(height: 12),
-                    Text('Kategori: ${t.category}', style: const TextStyle(fontWeight: FontWeight.w500)),
-                  ],
                   const SizedBox(height: 12),
-                  Text(
-                    'Dibuat: ${DateFormat('dd MMMM yyyy HH:mm').format(t.createdAt)}',
-                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                  _InfoRow(Icons.category, t.category ?? 'General'),
+                  _InfoRow(Icons.person, t.user?.name ?? 'Unknown'),
+                  if (t.assignee != null) _InfoRow(Icons.assignment, t.assignee!.name),
+                  _InfoRow(
+                    Icons.access_time,
+                    DateFormat('dd MMMM yyyy, HH:mm').format(t.createdAt),
                   ),
-                  if (t.assignee != null) ...[
-                    const SizedBox(height: 4),
-                    Text('Ditangani: ${t.assignee!.name}', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
-                  ],
                 ],
               ),
             ),
@@ -175,7 +224,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             const SizedBox(height: 16),
           ],
 
-          // Timeline/History
+          // Timeline/History (FR-010)
           const Text('Riwayat', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           ...t.history.map((h) => _TimelineItem(history: h)),
@@ -190,33 +239,41 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           const SizedBox(height: 16),
 
           // Add comment & upload
-          Row(
-            children: [
-              IconButton(
-                onPressed: _pickAndUpload,
-                icon: const Icon(Icons.attach_file),
-                tooltip: 'Upload lampiran',
-              ),
-              Expanded(
-                child: TextField(
-                  controller: _commentCtrl,
-                  decoration: InputDecoration(
-                    hintText: 'Tulis komentar...',
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.send, color: AppTheme.primary),
-                      onPressed: _submitComment,
-                    ),
-                  ),
-                  maxLines: 3,
-                  minLines: 1,
+          if (_isAdminOrHelpdesk) ...[
+            Row(
+              children: [
+                IconButton(
+                  onPressed: _pickAndUpload,
+                  icon: const Icon(Icons.attach_file),
+                  tooltip: 'Upload lampiran',
                 ),
-              ),
-            ],
-          ),
+                Expanded(
+                  child: TextField(
+                    controller: _commentCtrl,
+                    decoration: InputDecoration(
+                      hintText: 'Tulis komentar...',
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.send, color: AppTheme.primary),
+                        onPressed: _submitComment,
+                      ),
+                    ),
+                    maxLines: 3,
+                    minLines: 1,
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 80),
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _commentCtrl.dispose();
+    super.dispose();
   }
 }
 
@@ -228,8 +285,22 @@ class _Badge extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
         child: Text(label.toUpperCase(), style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 11)),
+      );
+}
+
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _InfoRow(this.icon, this.text);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [Icon(icon, size: 16, color: Colors.grey[600]), const SizedBox(width: 8), Expanded(child: Text(text, style: TextStyle(color: Colors.grey[700], fontSize: 13)))],
+        ),
       );
 }
 
@@ -249,7 +320,7 @@ class _TimelineItem extends StatelessWidget {
                   width: 12, height: 12,
                   decoration: const BoxDecoration(color: AppTheme.primary, shape: BoxShape.circle),
                 ),
-                Container(width: 2, height: 30, color: Colors.grey[300]),
+                if (history.note.isNotEmpty) Container(width: 2, height: 40, color: Colors.grey[300]),
               ],
             ),
             const SizedBox(width: 12),
@@ -258,14 +329,13 @@ class _TimelineItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    history.newStatus.replaceAll('_', ' ').toUpperCase(),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    '${history.oldStatus.toUpperCase()} → ${history.newStatus.toUpperCase()}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                   ),
-                  if (history.note.isNotEmpty)
-                    Text(history.note, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                  if (history.note.isNotEmpty) Text(history.note, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
                   Text(
-                    'oleh ${history.user?.name ?? '-'} · ${DateFormat('dd MMM yyyy HH:mm').format(history.createdAt)}',
-                    style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                    DateFormat('dd MMM, HH:mm').format(history.createdAt),
+                    style: TextStyle(color: Colors.grey[400], fontSize: 11),
                   ),
                 ],
               ),
@@ -280,33 +350,43 @@ class _CommentItem extends StatelessWidget {
   const _CommentItem({required this.comment});
 
   @override
-  Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Column(
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 14,
-                  child: Text(comment.user?.name[0] ?? '?'),
-                ),
-                const SizedBox(width: 8),
-                Text(comment.user?.name ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
-                const Spacer(),
-                Text(
-                  DateFormat('dd MMM HH:mm').format(comment.createdAt),
-                  style: TextStyle(color: Colors.grey[500], fontSize: 11),
-                ),
-              ],
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
+              child: Text(
+                comment.user?.name.substring(0, 2).toUpperCase() ?? 'U',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
+              ),
             ),
-            const SizedBox(height: 8),
-            Text(comment.content),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(comment.user?.name ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        const Spacer(),
+                        Text(DateFormat('dd MMM, HH:mm').format(comment.createdAt), style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(comment.content, style: const TextStyle(fontSize: 13)),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       );

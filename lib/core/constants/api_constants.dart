@@ -1,4 +1,7 @@
 class ApiConstants {
+  // ANDROID EMULATOR: http://10.0.2.2:8080/api/v1
+  // IOS SIMULATOR: http://localhost:8080/api/v1
+  // HP BENERAN: http://192.168.x.x:8080/api/v1
   static const String baseUrl = 'http://localhost:8080/api/v1';
   
   // Auth
