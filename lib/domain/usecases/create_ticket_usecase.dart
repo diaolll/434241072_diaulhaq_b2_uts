@@ -10,7 +10,7 @@ class CreateTicketUseCase {
     required String title,
     required String description,
     String? category,
-    String? priority,
+    String priority = 'medium',
   }) {
     return repository.createTicket(
       title: title,

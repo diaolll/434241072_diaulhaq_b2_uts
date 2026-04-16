@@ -1,18 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/models/user_model.dart';
-import '../../../core/theme/modern_theme.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/services/supabase_service.dart';
-import '../widgets/common/widgets.dart';
 
-/// Modern Profile Screen
-/// Features:
-/// - Clean profile header with gradient
-/// - User info display
-/// - Quick actions
-/// - Logout confirmation
+/// Clean Profile Screen - iOS Style
+/// No gradients, minimal design
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -20,56 +14,18 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen>
-    with SingleTickerProviderStateMixin {
+class _ProfileScreenState extends State<ProfileScreen> {
   final _authRepo = AuthRepository();
   UserModel? _user;
   bool _loading = true;
 
-  late AnimationController _headerController;
-  late Animation<double> _headerAnimation;
-
   @override
   void initState() {
     super.initState();
-
-    _headerController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-
-    _headerAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _headerController, curve: Curves.easeOut),
-    );
-
-    _headerController.forward();
     _loadUser();
   }
 
-  @override
-  void dispose() {
-    _headerController.dispose();
-    super.dispose();
-  }
-
   Future<void> _loadUser() async {
-    // Try to get user from Supabase first
-    final supabaseUser = SupabaseService.currentUser;
-    if (supabaseUser != null) {
-      setState(() {
-        _user = UserModel(
-          id: supabaseUser.id,
-          name: supabaseUser.userMetadata?['name'] ?? supabaseUser.email?.split('@')[0] ?? 'User',
-          email: supabaseUser.email ?? '',
-          role: supabaseUser.userMetadata?['role'] ?? 'user',
-          createdAt: supabaseUser.createdAt ?? DateTime.now(),
-        );
-        _loading = false;
-      });
-      return;
-    }
-
-    // Fallback to shared preferences
     final userId = await _authRepo.getUserId();
     final name = await _authRepo.getUserName();
     final email = await _authRepo.getUserEmail();
@@ -88,76 +44,45 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Future<void> _logout() async {
+    final isDark = context.isDark;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: isDark ? AppTheme.dark1 : AppTheme.surface0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: ModernTheme.error.withValues(alpha: 0.1),
+                color: isDark ? AppTheme.dark2 : AppTheme.surface1,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 Icons.logout_rounded,
-                color: ModernTheme.error,
-                size: 20,
+                color: AppTheme.priorityHigh,
+                size: 18,
               ),
             ),
             const SizedBox(width: 12),
             Text(
-              'Konfirmasi Keluar',
-              style: GoogleFonts.outfit(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
+              'Keluar?',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: isDark ? AppTheme.white : AppTheme.black),
             ),
           ],
         ),
         content: Text(
-          'Apakah Anda yakin ingin keluar dari akun?',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 15,
-            color: ModernTheme.stone600,
-          ),
+          'Anda akan keluar dari akun ini.',
+          style: TextStyle(fontSize: 14, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'Batal',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: ModernTheme.stone600,
-              ),
-            ),
+            child: Text('Batal', style: TextStyle(color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
           ),
-          ElevatedButton(
+          TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ModernTheme.error,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'Keluar',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            child: const Text('Keluar', style: TextStyle(color: AppTheme.priorityHigh, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -167,17 +92,6 @@ class _ProfileScreenState extends State<ProfileScreen>
       await _authRepo.logout();
       await SupabaseService.client.auth.signOut();
       if (mounted) context.go('/login');
-    }
-  }
-
-  Color _getRoleColor(String role) {
-    switch (role.toLowerCase()) {
-      case 'admin':
-        return ModernTheme.error;
-      case 'helpdesk':
-        return ModernTheme.warning;
-      default:
-        return ModernTheme.primary;
     }
   }
 
@@ -203,35 +117,37 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context.isDarkMode;
+    final isDark = context.isDark;
 
     if (_loading) {
       return Scaffold(
+        backgroundColor: isDark ? AppTheme.dark0 : AppTheme.surface1,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 60,
-                height: 60,
-                padding: const EdgeInsets.all(16),
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
-                  gradient: ModernTheme.primaryGradient,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: ModernTheme.primaryGlow,
+                  color: isDark ? AppTheme.white : AppTheme.black,
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: const CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 3,
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: isDark ? AppTheme.black : AppTheme.white,
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               Text(
                 'Memuat profil...',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 15,
-                  color: ModernTheme.stone500,
-                ),
+                style: TextStyle(fontSize: 14, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
               ),
             ],
           ),
@@ -240,126 +156,85 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
 
     return Scaffold(
+      backgroundColor: isDark ? AppTheme.dark0 : AppTheme.surface1,
       body: CustomScrollView(
         slivers: [
           // Header
           SliverAppBar(
-            expandedHeight: 240,
+            expandedHeight: 200,
             floating: false,
             pinned: true,
             elevation: 0,
             backgroundColor: Colors.transparent,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
-                decoration: BoxDecoration(
-                  gradient: ModernTheme.heroGradient,
-                ),
+                color: isDark ? AppTheme.white : AppTheme.black,
                 child: SafeArea(
-                  child: FadeTransition(
-                    opacity: _headerAnimation,
-                    child: SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(0, 0.1),
-                        end: Offset.zero,
-                      ).animate(_headerAnimation),
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            // Avatar
-                            Container(
-                              width: 100,
-                              height: 100,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Colors.white.withValues(alpha: 0.3),
-                                    Colors.white.withValues(alpha: 0.1),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(24),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.3),
-                                  width: 2,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.white.withValues(alpha: 0.2),
-                                    blurRadius: 20,
-                                    spreadRadius: 5,
-                                  ),
-                                ],
-                              ),
-                              child: Center(
-                                child: Text(
-                                  _getInitials(_user?.name ?? 'U'),
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 40,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-
-                            // Name
-                            Text(
-                              _user?.name ?? 'User',
-                              style: GoogleFonts.outfit(
-                                fontSize: 24,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Avatar
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: isDark ? AppTheme.black : AppTheme.white,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Center(
+                            child: Text(
+                              _getInitials(_user?.name ?? 'U'),
+                              style: TextStyle(
+                                fontSize: 32,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                                color: isDark ? AppTheme.white : AppTheme.black,
                               ),
                             ),
-                            const SizedBox(height: 4),
-
-                            // Email
-                            Text(
-                              _user?.email ?? '',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 14,
-                                color: Colors.white.withValues(alpha: 0.8),
-                              ),
-                            ),
-
-                            const SizedBox(height: 16),
-
-                            // Role Badge
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.3),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.badge_rounded,
-                                    size: 14,
-                                    color: Colors.white,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    _getRoleLabel(_user?.role ?? 'user'),
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 16),
+
+                        // Name
+                        Text(
+                          _user?.name ?? 'User',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? AppTheme.black : AppTheme.white,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+
+                        // Email
+                        Text(
+                          _user?.email ?? '',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isDark ? AppTheme.black.withValues(alpha: 0.7) : AppTheme.white.withValues(alpha: 0.7),
+                          ),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // Role Badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: isDark ? AppTheme.black.withValues(alpha: 0.2) : AppTheme.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(
+                            _getRoleLabel(_user?.role ?? 'user'),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? AppTheme.black : AppTheme.white,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -374,132 +249,95 @@ class _ProfileScreenState extends State<ProfileScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Stats Section
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildStatCard(
-                          icon: Icons.confirmation_number_rounded,
-                          label: 'Total Tiket',
-                          value: '0',
-                          color: ModernTheme.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildStatCard(
-                          icon: Icons.pending_rounded,
-                          label: 'Open',
-                          value: '0',
-                          color: ModernTheme.warning,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
                   // Account Info Section
                   Text(
                     'Informasi Akun',
-                    style: GoogleFonts.outfit(
-                      fontSize: 18,
+                    style: TextStyle(
+                      fontSize: 15,
                       fontWeight: FontWeight.w700,
-                      color: isDark ? ModernTheme.stone100 : ModernTheme.stone800,
+                      color: isDark ? AppTheme.white : AppTheme.black,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
-                  MenuItemCard(
+                  _MenuItem(
                     icon: Icons.person_outline_rounded,
                     title: 'Nama Lengkap',
                     subtitle: _user?.name ?? '-',
-                    showArrow: false,
+                    isDark: isDark,
                   ),
-                  MenuItemCard(
+                  const SizedBox(height: 8),
+                  _MenuItem(
                     icon: Icons.email_outlined,
                     title: 'Email',
                     subtitle: _user?.email ?? '-',
-                    showArrow: false,
+                    isDark: isDark,
                   ),
-                  MenuItemCard(
-                    icon: Icons.verified_user_outlined,
-                    title: 'Status Akun',
-                    subtitle: 'Aktif',
-                    iconColor: ModernTheme.success,
-                    showArrow: false,
+                  const SizedBox(height: 8),
+                  _MenuItem(
+                    icon: Icons.badge_outlined,
+                    title: 'Role',
+                    subtitle: _getRoleLabel(_user?.role ?? 'user'),
+                    isDark: isDark,
                   ),
                   const SizedBox(height: 24),
 
                   // Settings Section
                   Text(
                     'Pengaturan',
-                    style: GoogleFonts.outfit(
-                      fontSize: 18,
+                    style: TextStyle(
+                      fontSize: 15,
                       fontWeight: FontWeight.w700,
-                      color: isDark ? ModernTheme.stone100 : ModernTheme.stone800,
+                      color: isDark ? AppTheme.white : AppTheme.black,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
-                  MenuItemCard(
-                    icon: Icons.edit_outlined,
-                    title: 'Edit Profil',
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Row(
-                            children: [
-                              const Icon(Icons.info_outline, color: Colors.white),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Fitur edit profil belum tersedia',
-                                style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w500),
-                              ),
-                            ],
-                          ),
-                          backgroundColor: ModernTheme.info,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          margin: const EdgeInsets.all(16),
-                        ),
-                      );
-                    },
-                  ),
-                  MenuItemCard(
+                  _MenuAction(
                     icon: Icons.lock_outline,
                     title: 'Ubah Password',
+                    isDark: isDark,
                     onTap: () => context.push('/reset-password'),
                   ),
-                  MenuItemCard(
+                  const SizedBox(height: 8),
+                  _MenuAction(
                     icon: Icons.settings_outlined,
                     title: 'Pengaturan Aplikasi',
+                    isDark: isDark,
                     onTap: () => context.push('/settings'),
                   ),
-                  MenuItemCard(
+                  const SizedBox(height: 8),
+                  _MenuAction(
                     icon: Icons.notifications_outlined,
                     title: 'Notifikasi',
+                    isDark: isDark,
                     onTap: () => context.push('/notifications'),
                   ),
                   const SizedBox(height: 32),
 
                   // Logout Button
-                  AppButton(
-                    text: 'Keluar dari Akun',
-                    onPressed: _logout,
-                    type: AppButtonType.danger,
-                    icon: Icons.logout_rounded,
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: OutlinedButton(
+                      onPressed: _logout,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.priorityHigh,
+                        side: const BorderSide(color: AppTheme.priorityHigh, width: 1),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Keluar dari Akun', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                    ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
 
                   // Version
                   Center(
                     child: Text(
                       'Version 1.0.0',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: ModernTheme.stone400,
+                        color: isDark ? AppTheme.textTertiaryDark : AppTheme.textTertiary,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -513,59 +351,100 @@ class _ProfileScreenState extends State<ProfileScreen>
       ),
     );
   }
+}
 
-  Widget _buildStatCard({
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color color,
-  }) {
-    final isDark = context.isDarkMode;
+class _MenuItem extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool isDark;
 
+  const _MenuItem({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isDark ? ModernTheme.surfaceDarkElevated : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? ModernTheme.stone700.withValues(alpha: 0.5) : ModernTheme.stone200,
-          width: 1,
-        ),
-        boxShadow: ModernTheme.lightShadow,
+        color: isDark ? AppTheme.dark1 : AppTheme.surface0,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
       ),
-      child: Column(
+      child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+              color: isDark ? AppTheme.dark2 : AppTheme.surface1,
+              borderRadius: BorderRadius.circular(9),
             ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 24,
-            ),
+            child: Icon(icon, size: 18, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
           ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: GoogleFonts.outfit(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: ModernTheme.stone500,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(fontSize: 12, color: isDark ? AppTheme.textTertiaryDark : AppTheme.textTertiary)),
+                const SizedBox(height: 2),
+                Text(subtitle, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? AppTheme.white : AppTheme.black)),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _MenuAction extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _MenuAction({
+    required this.icon,
+    required this.title,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.dark1 : AppTheme.surface0,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: isDark ? AppTheme.dark2 : AppTheme.surface1,
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Icon(icon, size: 18, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: isDark ? AppTheme.white : AppTheme.black)),
+            ),
+            Icon(Icons.chevron_right_rounded, size: 18, color: isDark ? AppTheme.textTertiaryDark : AppTheme.textTertiary),
+          ],
+        ),
       ),
     );
   }

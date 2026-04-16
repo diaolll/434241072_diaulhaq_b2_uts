@@ -158,11 +158,11 @@ class TicketsNotifier extends StateNotifier<TicketsState> {
     state = state.copyWith(isLoading: true);
 
     try {
-      final result = await _repo.getTickets();
+      final tickets = await _repo.getTickets();
       final stats = await _repo.getDashboardStats();
 
       state = state.copyWith(
-        tickets: result['tickets'] as List<TicketModel>,
+        tickets: tickets,
         stats: stats,
         isLoading: false,
       );

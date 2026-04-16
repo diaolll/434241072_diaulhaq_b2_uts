@@ -1,22 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/services/supabase_service.dart';
 import '../../../data/models/ticket_model.dart';
 import '../../../data/repositories/ticket_repository.dart';
-import '../../../core/theme/modern_theme.dart';
-import '../../../core/services/supabase_service.dart';
-import '../../widgets/common/widgets.dart';
-import '../../widgets/common/app_input.dart';
 
-/// Modern Ticket Detail Screen
-/// Features:
-/// - Complete ticket information display
-/// - Status and priority badges
-/// - Comment system
-/// - Admin actions (update status, assign)
-/// - Attachments display
 class TicketDetailScreen extends StatefulWidget {
   final String ticketId;
   const TicketDetailScreen({super.key, required this.ticketId});
@@ -25,1025 +16,545 @@ class TicketDetailScreen extends StatefulWidget {
   State<TicketDetailScreen> createState() => _TicketDetailScreenState();
 }
 
-class _TicketDetailScreenState extends State<TicketDetailScreen>
-    with SingleTickerProviderStateMixin {
+class _TicketDetailScreenState extends State<TicketDetailScreen> {
   final _repo = TicketRepository();
   final _commentCtrl = TextEditingController();
-  final _focusNode = FocusNode();
   TicketModel? _ticket;
   bool _loading = true;
-  bool _submittingComment = false;
+  bool _submitting = false;
   String? _userRole;
-
-  late AnimationController _fabController;
-  late Animation<double> _fabAnimation;
-
-  // Available helpdesk users for assignment
-  final List<Map<String, String>> _helpdeskUsers = [
-    {'id': '1', 'name': 'Helpdesk 1'},
-    {'id': '2', 'name': 'Helpdesk 2'},
-    {'id': '3', 'name': 'Helpdesk 3'},
-  ];
 
   @override
   void initState() {
     super.initState();
     _load();
-
-    _fabController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _fabAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _fabController, curve: Curves.easeOut),
-    );
-    _fabController.forward();
   }
 
   @override
   void dispose() {
     _commentCtrl.dispose();
-    _focusNode.dispose();
-    _fabController.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
     try {
-      final ticket = await _repo.getTicketById(widget.ticketId);
-
-      // Try to get role from Supabase first
-      final supabaseUser = SupabaseService.currentUser;
-      String? role = supabaseUser?.userMetadata?['role'];
-
-      // Fallback to shared preferences
+      final t = await _repo.getTicketById(widget.ticketId);
+      String? role = SupabaseService.currentUser?.userMetadata?['role'];
       if (role == null) {
         final prefs = await SharedPreferences.getInstance();
         role = prefs.getString('user_role');
       }
 
-      setState(() {
-        _ticket = ticket;
-        _userRole = role;
-        _loading = false;
-      });
-    } catch (e) {
-      setState(() => _loading = false);
+      // Debug: print comments count
+      print('📋 Ticket loaded: ${t.title}');
+      print('💬 Comments count: ${t.comments.length}');
+      print('📎 Attachments count: ${t.attachments.length}');
+
+      if (mounted) setState(() { _ticket = t; _userRole = role; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> _submitComment() async {
-    if (_commentCtrl.text.trim().isEmpty) return;
-    setState(() => _submittingComment = true);
+  bool get _isAdmin => _userRole == 'admin' || _userRole == 'helpdesk';
 
+  Future<void> _addComment() async {
+    if (_commentCtrl.text.trim().isEmpty) return;
+    setState(() => _submitting = true);
     try {
       await _repo.addComment(widget.ticketId, _commentCtrl.text.trim());
       _commentCtrl.clear();
       await _load();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 12),
-                Text(
-                  'Komentar berhasil ditambahkan',
-                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w500),
-                ),
-              ],
-            ),
-            backgroundColor: ModernTheme.success,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
-      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Gagal: $e',
-                    style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w500),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: ModernTheme.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal: $e')));
       }
     } finally {
-      if (mounted) setState(() => _submittingComment = false);
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
   Future<void> _updateStatus(String status) async {
+    final isDark = context.isDark;
     final noteCtrl = TextEditingController();
-    final result = await showDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Update Status',
-          style: GoogleFonts.outfit(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
+        backgroundColor: isDark ? AppTheme.dark1 : AppTheme.surface0,
+        title: Text('Update ke ${AppTheme.statusLabel(status)}',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: isDark ? AppTheme.white : AppTheme.black)),
+        content: TextField(
+          controller: noteCtrl,
+          style: TextStyle(color: isDark ? AppTheme.white : AppTheme.black, fontSize: 14),
+          maxLines: 3,
+          decoration: InputDecoration(
+            hintText: 'Catatan (opsional)',
+            filled: true,
+            fillColor: isDark ? AppTheme.dark2 : AppTheme.surface1,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: isDark ? AppTheme.white : AppTheme.black, width: 1),
+            ),
           ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Ubah status tiket menjadi ${ModernTheme.getStatusLabel(status)}?',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
-                color: ModernTheme.stone600,
-              ),
-            ),
-            const SizedBox(height: 16),
-            AppInput(
-              controller: noteCtrl,
-              label: 'Catatan (opsional)',
-              hint: 'Tambahkan catatan untuk perubahan ini',
-              type: AppInputType.multiline,
-              maxLines: 3,
-            ),
-          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'Batal',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: ModernTheme.stone600,
-              ),
-            ),
+            child: Text('Batal', style: TextStyle(color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
           ),
-          ElevatedButton(
+          TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ModernTheme.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'Simpan',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            child: Text('Simpan', style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? AppTheme.white : AppTheme.black)),
           ),
         ],
       ),
     );
-
-    if (result == true) {
-      try {
-        await _repo.updateStatus(widget.ticketId, status, noteCtrl.text.trim());
-        await _load();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Status berhasil diperbarui',
-                    style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
-              backgroundColor: ModernTheme.success,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              margin: const EdgeInsets.all(16),
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Gagal: $e',
-                      style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                ],
-              ),
-              backgroundColor: ModernTheme.error,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              margin: const EdgeInsets.all(16),
-            ),
-          );
-        }
-      }
+    if (ok == true) {
+      await _repo.updateStatus(widget.ticketId, status, noteCtrl.text.trim());
+      await _load();
     }
     noteCtrl.dispose();
   }
 
-  Future<void> _assignTicket() async {
-    final selectedUserId = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+  @override
+  Widget build(BuildContext context) {
+    final isDark = context.isDark;
+
+    return Scaffold(
+      backgroundColor: isDark ? AppTheme.dark0 : AppTheme.surface1,
+      appBar: AppBar(
+        backgroundColor: isDark ? AppTheme.dark0 : AppTheme.surface1,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_rounded, size: 18, color: isDark ? AppTheme.white : AppTheme.black),
+          onPressed: () => context.pop(),
+        ),
         title: Text(
-          'Assign Tiket',
-          style: GoogleFonts.outfit(
-            fontSize: 18,
+          _ticket?.ticketNo ?? 'Detail Tiket',
+          style: TextStyle(
+            fontSize: 15,
             fontWeight: FontWeight.w700,
+            color: isDark ? AppTheme.white : AppTheme.black,
           ),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: _helpdeskUsers.map((user) => ListTile(
-            leading: CircleAvatar(
-              backgroundColor: ModernTheme.primary.withValues(alpha: 0.1),
-              child: Text(
-                user['name']![0],
-                style: TextStyle(
-                  color: ModernTheme.primary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            title: Text(user['name']!),
-            onTap: () => Navigator.pop(ctx, user['id']),
-          )).toList(),
-        ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              'Batal',
-              style: GoogleFonts.plusJakartaSans(
-                fontWeight: FontWeight.w600,
-                color: ModernTheme.stone600,
-              ),
-            ),
+          IconButton(
+            icon: Icon(Icons.refresh_rounded, size: 20, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
+            onPressed: _load,
           ),
         ],
       ),
+      body: _loading
+          ? Center(child: CircularProgressIndicator(color: isDark ? AppTheme.white : AppTheme.black, strokeWidth: 2))
+          : _ticket == null
+              ? Center(child: Text('Tiket tidak ditemukan', style: TextStyle(color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)))
+              : _buildBody(isDark),
     );
-
-    if (selectedUserId != null) {
-      await _repo.assignTicket(widget.ticketId, selectedUserId);
-      await _load();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 12),
-                Text(
-                  'Tiket berhasil diassign',
-                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w500),
-                ),
-              ],
-            ),
-            backgroundColor: ModernTheme.success,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
-      }
-    }
   }
 
-  bool get _isAdminOrHelpdesk => _userRole == 'admin' || _userRole == 'helpdesk';
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = context.isDarkMode;
-
-    if (_loading) {
-      return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AppLoadingIndicator(size: 40, color: ModernTheme.primary),
-              const SizedBox(height: 16),
-              Text(
-                'Memuat tiket...',
-                style: GoogleFonts.plusJakartaSans(
-                  color: ModernTheme.stone500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    if (_ticket == null) {
-      return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: ModernTheme.error.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.error_outline,
-                  size: 48,
-                  color: ModernTheme.error,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Tiket tidak ditemukan',
-                style: GoogleFonts.outfit(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: ModernTheme.stone800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Tiket yang Anda cari mungkin telah dihapus',
-                style: GoogleFonts.plusJakartaSans(
-                  color: ModernTheme.stone500,
-                ),
-              ),
-              const SizedBox(height: 24),
-              AppButton(
-                text: 'Kembali',
-                onPressed: () => context.pop(),
-                isFullWidth: false,
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
+  Widget _buildBody(bool isDark) {
     final t = _ticket!;
+    return RefreshIndicator(
+      onRefresh: _load,
+      color: isDark ? AppTheme.white : AppTheme.black,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+        children: [
+          // ── Status + Priority badges ──────────────────────────────────
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _Badge(label: AppTheme.statusLabel(t.status), color: AppTheme.statusColor(t.status), bg: AppTheme.statusBgColor(t.status, isDark: isDark)),
+              const SizedBox(width: 8),
+              _Badge(label: AppTheme.priorityLabel(t.priority), color: AppTheme.priorityColor(t.priority), bg: AppTheme.priorityBgColor(t.priority, isDark: isDark)),
+              if (t.category != null) ...[
+                const SizedBox(width: 8),
+                _Badge(label: t.category!, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary, bg: isDark ? AppTheme.dark2 : AppTheme.surface2),
+              ],
+            ],
+          ),
 
-    return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: _load,
-        color: ModernTheme.primary,
-        child: CustomScrollView(
-          slivers: [
-            // Header
-            SliverAppBar(
-              expandedHeight: 160,
-              floating: false,
-              pinned: true,
-              elevation: 0,
-              backgroundColor: Colors.transparent,
-              flexibleSpace: FlexibleSpaceBar(
-                title: Text(
-                  t.ticketNo,
-                  style: GoogleFonts.outfit(
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
+          // ── Title ─────────────────────────────────────────────────────
+          const SizedBox(height: 16),
+          _Card(
+            isDark: isDark,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Judul', style: _subLabel(isDark)),
+                const SizedBox(height: 6),
+                Text(t.title, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: isDark ? AppTheme.white : AppTheme.black, height: 1.3)),
+              ],
+            ),
+          ),
+
+          // ── Description ───────────────────────────────────────────────
+          const SizedBox(height: 10),
+          _Card(
+            isDark: isDark,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Deskripsi', style: _subLabel(isDark)),
+                const SizedBox(height: 6),
+                Text(t.description, style: TextStyle(fontSize: 14, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary, height: 1.6)),
+              ],
+            ),
+          ),
+
+          // ── Info ──────────────────────────────────────────────────────
+          const SizedBox(height: 10),
+          _Card(
+            isDark: isDark,
+            child: Column(
+              children: [
+                _InfoRow('Kategori', t.category ?? '-', isDark),
+                Divider(height: 20, color: isDark ? AppTheme.dark3 : AppTheme.surface2, thickness: 0.5),
+                _InfoRow('Prioritas', AppTheme.priorityLabel(t.priority), isDark),
+                Divider(height: 20, color: isDark ? AppTheme.dark3 : AppTheme.surface2, thickness: 0.5),
+                _InfoRow('Dibuat', DateFormat('dd MMM yyyy, HH:mm').format(t.createdAt), isDark),
+                Divider(height: 20, color: isDark ? AppTheme.dark3 : AppTheme.surface2, thickness: 0.5),
+                _InfoRow('Diperbarui', DateFormat('dd MMM yyyy, HH:mm').format(t.updatedAt), isDark),
+              ],
+            ),
+          ),
+
+          // ── Admin Actions ─────────────────────────────────────────────
+          if (_isAdmin) ...[
+            const SizedBox(height: 16),
+            Text('Update Status', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: ['open', 'in_progress', 'resolved', 'closed'].map((s) {
+                final isCurrent = t.status == s;
+                return GestureDetector(
+                  onTap: isCurrent ? null : () => _updateStatus(s),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isCurrent ? AppTheme.statusColor(s) : AppTheme.statusBgColor(s, isDark: isDark),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppTheme.statusColor(s),
+                        width: 0.5,
+                      ),
+                    ),
+                    child: Text(
+                      AppTheme.statusLabel(s),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: isCurrent ? AppTheme.white : AppTheme.statusColor(s),
+                      ),
+                    ),
                   ),
+                );
+              }).toList(),
+            ),
+          ],
+
+          // ── Attachments ───────────────────────────────────────────────
+          if (t.attachments.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            Text('Lampiran', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
+            const SizedBox(height: 10),
+            ...t.attachments.map((a) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _AttachmentCard(attachment: a, isDark: isDark),
+            )),
+          ],
+
+          // ── Comments ──────────────────────────────────────────────────
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Text(
+                'Komentar',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isDark ? AppTheme.dark2 : AppTheme.surface2,
+                  borderRadius: BorderRadius.circular(5),
                 ),
-                background: Container(
-                  decoration: BoxDecoration(
-                    gradient: ModernTheme.heroGradient,
-                  ),
+                child: Text(
+                  '${t.comments.length}',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
                 ),
               ),
-              actions: [
-                if (_isAdminOrHelpdesk)
-                  IconButton(
-                    icon: const Icon(Icons.person_add_rounded, color: Colors.white),
-                    onPressed: _assignTicket,
-                    tooltip: 'Assign Tiket',
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Comment Input
+          _Card(
+            isDark: isDark,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _commentCtrl,
+                    maxLines: 4,
+                    minLines: 1,
+                    style: TextStyle(fontSize: 14, color: isDark ? AppTheme.white : AppTheme.black),
+                    decoration: InputDecoration(
+                      hintText: 'Tulis komentar...',
+                      hintStyle: TextStyle(fontSize: 14, color: isDark ? AppTheme.textTertiaryDark : AppTheme.textTertiary),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
-                IconButton(
-                  icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-                  onPressed: _load,
-                  tooltip: 'Refresh',
+                ),
+                const SizedBox(width: 10),
+                GestureDetector(
+                  onTap: _submitting ? null : _addComment,
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.white : AppTheme.black,
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: _submitting
+                        ? Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: CircularProgressIndicator(strokeWidth: 2, color: isDark ? AppTheme.black : AppTheme.white),
+                          )
+                        : Icon(Icons.send_rounded, size: 18, color: isDark ? AppTheme.black : AppTheme.white),
+                  ),
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 10),
 
-            // Content
-            SliverToBoxAdapter(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
+          // Comment List
+          if (t.comments.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  'Belum ada komentar',
+                  style: TextStyle(fontSize: 13, color: isDark ? AppTheme.textTertiaryDark : AppTheme.textTertiary),
+                ),
+              ),
+            )
+          else
+            ...t.comments.map((c) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _Card(
+                isDark: isDark,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Status & Priority Badges
-                    TicketBadges(
-                      status: t.status,
-                      priority: t.priority,
-                      category: t.category,
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Title Card
-                    _buildSectionCard(
-                      title: 'Judul Tiket',
-                      child: Text(
-                        t.title,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: isDark ? ModernTheme.stone100 : ModernTheme.stone800,
-                          height: 1.4,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Description Card
-                    _buildSectionCard(
-                      title: 'Deskripsi',
-                      child: Text(
-                        t.description,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 15,
-                          color: isDark ? ModernTheme.stone200 : ModernTheme.stone700,
-                          height: 1.6,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Info Grid
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: isDark ? ModernTheme.surfaceDarkElevated : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isDark ? ModernTheme.stone700.withValues(alpha: 0.5) : ModernTheme.stone200,
-                          width: 1,
-                        ),
-                        boxShadow: ModernTheme.lightShadow,
-                      ),
-                      child: Column(
-                        children: [
-                          _buildInfoRow('Kategori', t.category ?? '-'),
-                          const Divider(height: 24),
-                          _buildInfoRow('Prioritas', ModernTheme.getPriorityLabel(t.priority)),
-                          const Divider(height: 24),
-                          _buildInfoRow('Dibuat', DateFormat('dd MMM yyyy, HH:mm').format(t.createdAt)),
-                          const Divider(height: 24),
-                          _buildInfoRow('Updated', DateFormat('dd MMM yyyy, HH:mm').format(t.updatedAt)),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Admin Actions
-                    if (_isAdminOrHelpdesk) ...[
-                      Row(
-                        children: [
-                          Text(
-                            'Update Status',
-                            style: GoogleFonts.outfit(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: isDark ? ModernTheme.stone100 : ModernTheme.stone800,
-                            ),
-                          ),
-                          const Spacer(),
-                          Icon(
-                            Icons.admin_panel_settings_rounded,
-                            color: ModernTheme.primary,
-                            size: 20,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          _buildStatusActionChip('Open', t.status != 'open', ModernTheme.info),
-                          _buildStatusActionChip('In Progress', t.status != 'in_progress', ModernTheme.warning),
-                          _buildStatusActionChip('Resolved', t.status != 'resolved', ModernTheme.success),
-                          _buildStatusActionChip('Closed', t.status != 'closed', ModernTheme.stone400),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                    ],
-
-                    // Attachments
-                    if (t.attachments.isNotEmpty) ...[
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.attach_file_rounded,
-                            color: ModernTheme.primary,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Lampiran',
-                            style: GoogleFonts.outfit(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: isDark ? ModernTheme.stone100 : ModernTheme.stone800,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: ModernTheme.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              '${t.attachments.length}',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: ModernTheme.primary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      ...List.generate(t.attachments.length, (i) {
-                        final att = t.attachments[i];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: isDark ? ModernTheme.surfaceDarkElevated : Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isDark ? ModernTheme.stone700.withValues(alpha: 0.5) : ModernTheme.stone200,
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: ModernTheme.info.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Icon(
-                                  _getFileIcon(att.fileName),
-                                  color: ModernTheme.info,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      att.fileName,
-                                      style: GoogleFonts.plusJakartaSans(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: isDark ? ModernTheme.stone100 : ModernTheme.stone800,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    Text(
-                                      att.fileType.toUpperCase(),
-                                      style: GoogleFonts.plusJakartaSans(
-                                        fontSize: 11,
-                                        color: ModernTheme.stone500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Icon(
-                                Icons.download_rounded,
-                                color: ModernTheme.primary,
-                                size: 20,
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
-                      const SizedBox(height: 20),
-                    ],
-
-                    // Comments Section
                     Row(
                       children: [
-                        Icon(
-                          Icons.comment_rounded,
-                          color: ModernTheme.primary,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Komentar & Diskusi',
-                          style: GoogleFonts.outfit(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: isDark ? ModernTheme.stone100 : ModernTheme.stone800,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          width: 28,
+                          height: 28,
                           decoration: BoxDecoration(
-                            color: ModernTheme.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(10),
+                            color: isDark ? AppTheme.dark3 : AppTheme.surface2,
+                            borderRadius: BorderRadius.circular(7),
                           ),
-                          child: Text(
-                            '${t.comments.length}',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: ModernTheme.primary,
+                          child: Center(
+                            child: Text(
+                              (c.user?.name.isNotEmpty == true ? c.user!.name[0] : '?').toUpperCase(),
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? AppTheme.white : AppTheme.black),
                             ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                c.user?.name ?? 'Unknown',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? AppTheme.white : AppTheme.black),
+                              ),
+                              Text(
+                                DateFormat('dd MMM, HH:mm').format(c.createdAt),
+                                style: TextStyle(fontSize: 10, color: isDark ? AppTheme.textTertiaryDark : AppTheme.textTertiary),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-
-                    // Comment Input
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: isDark ? ModernTheme.surfaceDarkElevated : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: _focusNode.hasFocus
-                              ? ModernTheme.primary
-                              : (isDark ? ModernTheme.stone700.withValues(alpha: 0.5) : ModernTheme.stone200),
-                          width: _focusNode.hasFocus ? 2 : 1,
-                        ),
-                        boxShadow: _focusNode.hasFocus ? ModernTheme.primaryGlow : null,
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _commentCtrl,
-                              focusNode: _focusNode,
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 15,
-                                color: isDark ? ModernTheme.stone100 : ModernTheme.stone800,
-                              ),
-                              decoration: InputDecoration(
-                                hintText: 'Tulis komentar...',
-                                hintStyle: GoogleFonts.plusJakartaSans(
-                                  color: ModernTheme.stone400,
-                                ),
-                                border: InputBorder.none,
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                              maxLines: 4,
-                              minLines: 1,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          GestureDetector(
-                            onTap: _submittingComment ? null : _submitComment,
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                gradient: _submittingComment
-                                    ? null
-                                    : ModernTheme.primaryGradient,
-                                color: _submittingComment ? ModernTheme.stone300 : null,
-                                borderRadius: BorderRadius.circular(14),
-                                boxShadow: _submittingComment
-                                    ? null
-                                    : ModernTheme.primaryGlow,
-                              ),
-                              child: _submittingComment
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Icon(
-                                      Icons.send_rounded,
-                                      color: Colors.white,
-                                      size: 20,
-                                    ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Comments List
-                    if (t.comments.isNotEmpty)
-                      ...List.generate(t.comments.length, (i) {
-                        final comment = t.comments[i];
-                        return _CommentTile(comment: comment);
-                      })
-                    else
-                      Container(
-                        padding: const EdgeInsets.all(32),
-                        decoration: BoxDecoration(
-                          color: isDark ? ModernTheme.surfaceDarkElevated : ModernTheme.stone100.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: isDark ? ModernTheme.stone700.withValues(alpha: 0.5) : ModernTheme.stone200,
-                            width: 1,
-                          ),
-                        ),
-                        child: Column(
-                          children: [
-                            Icon(
-                              Icons.comment_outlined,
-                              size: 40,
-                              color: ModernTheme.stone400,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Belum ada komentar',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 14,
-                                color: ModernTheme.stone500,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Jadilah yang pertama berkomentar',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 12,
-                                color: ModernTheme.stone400,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    const SizedBox(height: 100),
+                    const SizedBox(height: 8),
+                    Text(c.content, style: TextStyle(fontSize: 13, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary, height: 1.5)),
                   ],
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSectionCard({required String title, required Widget child}) {
-    final isDark = context.isDarkMode;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? ModernTheme.surfaceDarkElevated : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? ModernTheme.stone700.withValues(alpha: 0.5) : ModernTheme.stone200,
-          width: 1,
-        ),
-        boxShadow: ModernTheme.lightShadow,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 12,
-              color: ModernTheme.stone500,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 12),
-          child,
+            )),
         ],
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
-    final isDark = context.isDarkMode;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              color: ModernTheme.stone500,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          Text(
-            value,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: isDark ? ModernTheme.stone100 : ModernTheme.stone800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusActionChip(String label, bool enabled, Color color) {
-    final isDark = context.isDarkMode;
-
-    return GestureDetector(
-      onTap: enabled ? () => _updateStatus(label.toLowerCase().replaceAll(' ', '_')) : null,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          gradient: enabled ? LinearGradient(colors: [color, color.withValues(alpha: 0.8)]) : null,
-          color: enabled ? null : (isDark ? ModernTheme.stone700 : ModernTheme.stone200),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: enabled ? color : (isDark ? ModernTheme.stone700 : ModernTheme.stone300),
-            width: enabled ? 0 : 1,
-          ),
-          boxShadow: enabled
-              ? [
-                  BoxShadow(
-                    color: color.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: enabled ? Colors.white : ModernTheme.stone500,
-          ),
-        ),
-      ),
-    );
-  }
-
-  IconData _getFileIcon(String fileName) {
-    final ext = fileName.split('.').last.toLowerCase();
-    switch (ext) {
-      case 'pdf':
-        return Icons.picture_as_pdf_rounded;
-      case 'doc':
-      case 'docx':
-        return Icons.description_rounded;
-      case 'xls':
-      case 'xlsx':
-        return Icons.table_chart_rounded;
-      case 'jpg':
-      case 'jpeg':
-      case 'png':
-      case 'gif':
-        return Icons.image_rounded;
-      default:
-        return Icons.attach_file_rounded;
-    }
-  }
+  TextStyle _subLabel(bool isDark) => TextStyle(
+    fontSize: 11,
+    fontWeight: FontWeight.w600,
+    color: isDark ? AppTheme.textTertiaryDark : AppTheme.textTertiary,
+    letterSpacing: 0.3,
+  );
 }
 
-class _CommentTile extends StatelessWidget {
-  final CommentModel comment;
-  const _CommentTile({required this.comment});
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+class _Card extends StatelessWidget {
+  final Widget child;
+  final bool isDark;
+  const _Card({required this.child, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context.isDarkMode;
-    final authorName = comment.user?.name ?? 'Unknown';
-    final initial = authorName.isNotEmpty ? authorName[0].toUpperCase() : '?';
-
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isDark ? ModernTheme.surfaceDarkElevated : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? ModernTheme.stone700.withValues(alpha: 0.5) : ModernTheme.stone200,
-          width: 1,
-        ),
-        boxShadow: ModernTheme.lightShadow,
+        color: isDark ? AppTheme.dark1 : AppTheme.surface0,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  gradient: ModernTheme.primaryGradient,
-                  borderRadius: BorderRadius.circular(12),
+      child: child,
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  final String label;
+  final Color color;
+  final Color bg;
+  const _Badge({required this.label, required this.color, required this.bg});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
+      child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool isDark;
+  const _InfoRow(this.label, this.value, this.isDark);
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: TextStyle(fontSize: 13, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
+        Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? AppTheme.white : AppTheme.black)),
+      ],
+    );
+  }
+}
+
+class _AttachmentCard extends StatelessWidget {
+  final dynamic attachment;
+  final bool isDark;
+
+  const _AttachmentCard({required this.attachment, required this.isDark});
+
+  bool get _isImage {
+    final type = attachment.fileType?.toLowerCase() ?? '';
+    return type.startsWith('image/');
+  }
+
+  String get _fileName => attachment.fileName ?? 'Attachment';
+  String get _fileUrl => attachment.fileUrl ?? '';
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () async {
+        if (_fileUrl.isNotEmpty) {
+          final uri = Uri.parse(_fileUrl);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.dark1 : AppTheme.surface0,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
+        ),
+        child: Row(
+          children: [
+            // Thumbnail or icon
+            if (_isImage && _fileUrl.isNotEmpty)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  _fileUrl,
+                  width: 48,
+                  height: 48,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _buildIcon(),
                 ),
-                child: Center(
-                  child: Text(
-                    initial,
-                    style: GoogleFonts.outfit(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                    ),
+              )
+            else
+              _buildIcon(),
+            const SizedBox(width: 12),
+            // File info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _fileName,
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? AppTheme.white : AppTheme.black),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      authorName,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                        color: isDark ? ModernTheme.stone100 : ModernTheme.stone800,
-                      ),
-                    ),
-                    Text(
-                      DateFormat('dd MMM yyyy, HH:mm').format(comment.createdAt),
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        color: ModernTheme.stone400,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          if (comment.content.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(
-              comment.content,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
-                color: isDark ? ModernTheme.stone200 : ModernTheme.stone700,
-                height: 1.5,
+                  Text(
+                    _isImage ? 'Gambar' : 'Dokumen',
+                    style: TextStyle(fontSize: 11, color: isDark ? AppTheme.textTertiaryDark : AppTheme.textTertiary),
+                  ),
+                ],
               ),
             ),
+            Icon(Icons.download_outlined, size: 18, color: isDark ? AppTheme.textTertiaryDark : AppTheme.textTertiary),
           ],
-        ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIcon() {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.dark2 : AppTheme.surface1,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(
+        _isImage ? Icons.image_outlined : Icons.insert_drive_file_outlined,
+        size: 22,
+        color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary,
       ),
     );
   }

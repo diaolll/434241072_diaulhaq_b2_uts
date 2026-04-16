@@ -1,31 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/router/app_router.dart';
-import 'core/theme/modern_theme.dart';
+import 'core/theme/app_theme.dart';
 import 'core/config/env_config.dart';
 import 'core/services/theme_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load .env file
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.dark,
+  ));
+
   await dotenv.load(fileName: ".env");
 
-  // Initialize Supabase
   await Supabase.initialize(
     url: EnvConfig.supabaseUrl,
     anonKey: EnvConfig.supabaseAnonKey,
   );
 
-  // Initialize ThemeService
   await ThemeService().init();
 
   runApp(
-    const ProviderScope(
-      child: MyApp(),
-    ),
+    const ProviderScope(child: MyApp()),
   );
 }
 
@@ -36,12 +37,12 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: ThemeService(),
-      builder: (context, child) {
+      builder: (context, _) {
         return MaterialApp.router(
-          title: 'E-Ticketing Helpdesk',
+          title: 'HelpDesk',
           debugShowCheckedModeBanner: false,
-          theme: ModernTheme.lightTheme,
-          darkTheme: ModernTheme.darkTheme,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
           themeMode: ThemeService().themeMode,
           routerConfig: appRouter,
         );

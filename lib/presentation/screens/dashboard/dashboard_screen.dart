@@ -2,19 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../data/providers/providers.dart';
-import '../../../../core/theme/modern_theme.dart';
-import '../../widgets/common/app_card.dart';
-import '../../widgets/common/app_button.dart';
-import '../../widgets/common/empty_state.dart';
 
-/// Modern Dashboard Screen
-/// Features:
-/// - Animated stat cards with staggered entrance
-/// - Interactive pie chart with legend
-/// - Quick action chips
-/// - Smooth refresh indicator
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
@@ -22,637 +12,673 @@ class DashboardScreen extends ConsumerStatefulWidget {
   ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends ConsumerState<DashboardScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _fabController;
-  late Animation<double> _fabAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _fabController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _fabAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _fabController, curve: Curves.easeOut),
-    );
-    _fabController.forward();
-  }
-
-  @override
-  void dispose() {
-    _fabController.dispose();
-    super.dispose();
-  }
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  int _tab = 0;
 
   @override
   Widget build(BuildContext context) {
+    final isDark = context.isDark;
     final ticketsState = ref.watch(ticketsProvider);
     final stats = ticketsState.stats;
-    final isDark = context.isDarkMode;
 
     return Scaffold(
-      body: ticketsState.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: () => ref.read(ticketsProvider.notifier).refresh(),
-              color: ModernTheme.primary,
-              backgroundColor: isDark ? ModernTheme.surfaceDarkElevated : Colors.white,
-              child: CustomScrollView(
-                slivers: [
-                  // Modern App Bar with gradient
-                  SliverAppBar(
-                    expandedHeight: 140,
-                    floating: false,
-                    pinned: true,
-                    elevation: 0,
-                    backgroundColor: Colors.transparent,
-                    flexibleSpace: FlexibleSpaceBar(
-                      titlePadding: const EdgeInsets.only(bottom: 16, left: 20, right: 20),
-                      title: AnimatedOpacity(
-                        opacity: ticketsState.isLoading ? 0 : 1,
-                        duration: const Duration(milliseconds: 300),
-                        child: Text(
-                          'Dashboard',
-                          style: GoogleFonts.outfit(
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                            fontSize: 20,
-                          ),
-                        ),
-                      ),
-                      background: Container(
-                        decoration: BoxDecoration(
-                          gradient: ModernTheme.heroGradient,
-                        ),
-                        child: SafeArea(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Spacer(),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            _getGreeting(),
-                                            style: GoogleFonts.plusJakartaSans(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.white.withValues(alpha: 0.9),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            'Ringkasan aktivitas tiket Anda',
-                                            style: GoogleFonts.outfit(
-                                              fontSize: 20,
-                                              fontWeight: FontWeight.w700,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.all(10),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.2),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: const Icon(
-                                        Icons.notifications_outlined,
-                                        color: Colors.white,
-                                        size: 22,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Content
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
+      backgroundColor: isDark ? AppTheme.dark0 : AppTheme.surface1,
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: () => ref.read(ticketsProvider.notifier).refresh(),
+          color: isDark ? AppTheme.white : AppTheme.black,
+          child: CustomScrollView(
+            slivers: [
+              // ── Header ───────────────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Stats Cards
-                          if (stats.isNotEmpty) ...[
-                            _buildStatsGrid(stats),
-                            const SizedBox(height: 28),
-
-                            // Chart Section
-                            _buildChartSection(stats),
-                            const SizedBox(height: 28),
-
-                            // Quick Actions
-                            _buildQuickActions(),
-                          ] else
-                            _buildEmptyState(),
-                          const SizedBox(height: 100),
+                          Text(
+                            _greeting(),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Dashboard',
+                            style: TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.8,
+                              color: isDark ? AppTheme.white : AppTheme.black,
+                            ),
+                          ),
                         ],
                       ),
-                    ),
+                      GestureDetector(
+                        onTap: () => context.push('/notifications'),
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: isDark ? AppTheme.dark2 : AppTheme.surface0,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
+                          ),
+                          child: Icon(
+                            Icons.notifications_outlined,
+                            size: 20,
+                            color: isDark ? AppTheme.white : AppTheme.black,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-      bottomNavigationBar: _buildBottomNav(),
+
+              // ── Stats Cards ───────────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                  child: ticketsState.isLoading
+                      ? const _StatsShimmer()
+                      : _StatsRow(stats: stats, isDark: isDark),
+                ),
+              ),
+
+              // ── Chart Section ─────────────────────────────────────────────
+              if (!ticketsState.isLoading && stats.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                    child: _ChartCard(stats: stats, isDark: isDark),
+                  ),
+                ),
+
+              // ── Recent Tickets ────────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Tiket Terbaru',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.3,
+                          color: isDark ? AppTheme.white : AppTheme.black,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => context.push('/tickets'),
+                        child: Text(
+                          'Lihat Semua',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              if (ticketsState.isLoading)
+                const SliverToBoxAdapter(child: SizedBox(height: 80))
+              else if (ticketsState.tickets.isEmpty)
+                SliverToBoxAdapter(
+                  child: _EmptyDashboard(isDark: isDark),
+                )
+              else
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (ctx, i) {
+                      final t = ticketsState.tickets[i];
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                        child: _TicketRow(
+                          id: t.ticketNo,
+                          title: t.title,
+                          status: t.status,
+                          priority: t.priority,
+                          isDark: isDark,
+                          onTap: () => context.push('/tickets/${t.id}'),
+                        ),
+                      );
+                    },
+                    childCount: (ticketsState.tickets.length).clamp(0, 5),
+                  ),
+                ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 100)),
+            ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: _BottomBar(
+        current: _tab,
+        onChanged: (i) {
+          setState(() => _tab = i);
+          switch (i) {
+            case 1: context.push('/tickets'); break;
+            case 2: context.push('/notifications'); break;
+            case 3: context.push('/profile'); break;
+          }
+        },
+        isDark: isDark,
+        onFab: () => context.push('/tickets/create'),
+      ),
     );
   }
 
-  Widget _buildStatsGrid(Map<String, int> stats) {
+  String _greeting() {
+    final h = DateTime.now().hour;
+    if (h < 12) return 'Selamat Pagi 🌤';
+    if (h < 17) return 'Selamat Siang ☀️';
+    return 'Selamat Malam 🌙';
+  }
+}
+
+// ── Stat cards ────────────────────────────────────────────────────────────────
+
+class _StatsRow extends StatelessWidget {
+  final Map<String, int> stats;
+  final bool isDark;
+  const _StatsRow({required this.stats, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Text(
-              'Statistik Tiket',
-              style: GoogleFonts.outfit(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: ModernTheme.stone800,
+            Expanded(
+              child: _StatCard(
+                label: 'Total',
+                value: '${stats['total'] ?? 0}',
+                isDark: isDark,
+                accent: isDark ? AppTheme.white : AppTheme.black,
+                bg: isDark ? AppTheme.dark2 : AppTheme.surface0,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _StatCard(
+                label: 'Open',
+                value: '${stats['open'] ?? 0}',
+                isDark: isDark,
+                accent: AppTheme.statusOpen,
+                bg: AppTheme.statusOpenBg,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 1.4,
+        const SizedBox(height: 12),
+        Row(
           children: [
-            _buildAnimatedStatCard(
-              index: 0,
-              label: 'Total Tiket',
-              value: '${stats['total'] ?? 0}',
-              icon: Icons.confirmation_number_rounded,
-              gradient: ModernTheme.heroGradient,
-              color: ModernTheme.primary,
-              delay: 0,
+            Expanded(
+              child: _StatCard(
+                label: 'In Progress',
+                value: '${stats['in_progress'] ?? 0}',
+                isDark: isDark,
+                accent: AppTheme.statusInProgress,
+                bg: AppTheme.statusInProgressBg,
+              ),
             ),
-            _buildAnimatedStatCard(
-              index: 1,
-              label: 'Open',
-              value: '${stats['open'] ?? 0}',
-              icon: Icons.inbox_rounded,
-              color: ModernTheme.info,
-              delay: 100,
-            ),
-            _buildAnimatedStatCard(
-              index: 2,
-              label: 'In Progress',
-              value: '${stats['in_progress'] ?? 0}',
-              icon: Icons.pending_rounded,
-              color: ModernTheme.warning,
-              delay: 200,
-            ),
-            _buildAnimatedStatCard(
-              index: 3,
-              label: 'Resolved',
-              value: '${stats['resolved'] ?? 0}',
-              icon: Icons.check_circle_rounded,
-              color: ModernTheme.success,
-              delay: 300,
+            const SizedBox(width: 12),
+            Expanded(
+              child: _StatCard(
+                label: 'Resolved',
+                value: '${stats['resolved'] ?? 0}',
+                isDark: isDark,
+                accent: AppTheme.statusResolved,
+                bg: AppTheme.statusResolvedBg,
+              ),
             ),
           ],
         ),
       ],
     );
   }
+}
 
-  Widget _buildAnimatedStatCard({
-    required int index,
-    required String label,
-    required String value,
-    required IconData icon,
-    required Color color,
-    LinearGradient? gradient,
-    required int delay,
-  }) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: Duration(milliseconds: 600 + delay),
-      curve: Curves.easeOut,
-      builder: (context, animation, child) {
-        return Transform.translate(
-          offset: Offset(0, 30 * (1 - animation)),
-          child: Opacity(
-            opacity: animation,
-            child: StatCard(
-              label: label,
-              value: value,
-              icon: icon,
-              color: color,
-              gradient: gradient,
-              isBig: true,
-            ),
-          ),
-        );
-      },
-    );
-  }
+class _StatCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color accent;
+  final Color bg;
+  final bool isDark;
+  const _StatCard({required this.label, required this.value, required this.accent, required this.bg, required this.isDark});
 
-  Widget _buildChartSection(Map<String, int> stats) {
-    final total = (stats['open'] ?? 0) +
-        (stats['in_progress'] ?? 0) +
-        (stats['resolved'] ?? 0) +
-        (stats['closed'] ?? 0);
-
-    if (total == 0) {
-      return const EmptyState(
-        title: 'Belum ada data tiket',
-        subtitle: 'Buat tiket pertama Anda untuk melihat statistik',
-        type: EmptyStateType.noTickets,
-      );
-    }
-
-    final isDark = context.isDarkMode;
-
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: isDark ? ModernTheme.surfaceDarkElevated : Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: isDark
-              ? ModernTheme.stone700.withValues(alpha: 0.5)
-              : ModernTheme.stone200.withValues(alpha: 0.6),
-          width: 1,
-        ),
-        boxShadow: ModernTheme.lightShadow,
+        color: isDark ? AppTheme.dark1 : bg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: ModernTheme.accent.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.pie_chart_outline_rounded,
-                  color: ModernTheme.accent,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Distribusi Status',
-                style: GoogleFonts.outfit(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: ModernTheme.stone800,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            height: 200,
-            child: PieChart(
-              PieChartData(
-                sectionsSpace: 2,
-                centerSpaceRadius: 40,
-                sections: [
-                  if ((stats['open'] ?? 0) > 0)
-                    PieChartSectionData(
-                      value: (stats['open'] ?? 0).toDouble(),
-                      color: ModernTheme.info,
-                      title: '${stats['open']}',
-                      radius: 70,
-                      titleStyle: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  if ((stats['in_progress'] ?? 0) > 0)
-                    PieChartSectionData(
-                      value: (stats['in_progress'] ?? 0).toDouble(),
-                      color: ModernTheme.warning,
-                      title: '${stats['in_progress']}',
-                      radius: 70,
-                      titleStyle: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  if ((stats['resolved'] ?? 0) > 0)
-                    PieChartSectionData(
-                      value: (stats['resolved'] ?? 0).toDouble(),
-                      color: ModernTheme.success,
-                      title: '${stats['resolved']}',
-                      radius: 70,
-                      titleStyle: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  if ((stats['closed'] ?? 0) > 0)
-                    PieChartSectionData(
-                      value: (stats['closed'] ?? 0).toDouble(),
-                      color: ModernTheme.stone400,
-                      title: '${stats['closed']}',
-                      radius: 70,
-                      titleStyle: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                ],
-              ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -1,
+              color: accent,
             ),
           ),
-          const SizedBox(height: 24),
-          Wrap(
-            spacing: 16,
-            runSpacing: 12,
-            alignment: WrapAlignment.center,
-            children: [
-              if ((stats['open'] ?? 0) > 0) _buildLegend('Open', ModernTheme.info, stats['open'] ?? 0),
-              if ((stats['in_progress'] ?? 0) > 0)
-                _buildLegend('In Progress', ModernTheme.warning, stats['in_progress'] ?? 0),
-              if ((stats['resolved'] ?? 0) > 0)
-                _buildLegend('Resolved', ModernTheme.success, stats['resolved'] ?? 0),
-              if ((stats['closed'] ?? 0) > 0)
-                _buildLegend('Closed', ModernTheme.stone400, stats['closed'] ?? 0),
-            ],
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: isDark ? AppTheme.textTertiaryDark : AppTheme.textSecondary,
+            ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildLegend(String label, Color color, int count) {
+class _StatsShimmer extends StatelessWidget {
+  const _StatsShimmer();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = context.isDark;
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 12,
+      childAspectRatio: 1.6,
+      children: List.generate(4, (_) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.dark2 : AppTheme.surface2,
+          borderRadius: BorderRadius.circular(14),
+        ),
+      )),
+    );
+  }
+}
+
+// ── Chart ─────────────────────────────────────────────────────────────────────
+
+class _ChartCard extends StatelessWidget {
+  final Map<String, int> stats;
+  final bool isDark;
+  const _ChartCard({required this.stats, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final total = (stats['open'] ?? 0) + (stats['in_progress'] ?? 0) + (stats['resolved'] ?? 0) + (stats['closed'] ?? 0);
+    if (total == 0) return const SizedBox.shrink();
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
+        color: isDark ? AppTheme.dark1 : AppTheme.surface0,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Distribusi Status',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: isDark ? AppTheme.white : AppTheme.black,
+            ),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 160,
+            child: Row(
+              children: [
+                Expanded(
+                  child: PieChart(
+                    PieChartData(
+                      sectionsSpace: 2,
+                      centerSpaceRadius: 36,
+                      sections: [
+                        if ((stats['open'] ?? 0) > 0)
+                          PieChartSectionData(
+                            value: (stats['open'] ?? 0).toDouble(),
+                            color: AppTheme.statusOpen,
+                            radius: 52,
+                            title: '',
+                          ),
+                        if ((stats['in_progress'] ?? 0) > 0)
+                          PieChartSectionData(
+                            value: (stats['in_progress'] ?? 0).toDouble(),
+                            color: AppTheme.statusInProgress,
+                            radius: 52,
+                            title: '',
+                          ),
+                        if ((stats['resolved'] ?? 0) > 0)
+                          PieChartSectionData(
+                            value: (stats['resolved'] ?? 0).toDouble(),
+                            color: AppTheme.statusResolved,
+                            radius: 52,
+                            title: '',
+                          ),
+                        if ((stats['closed'] ?? 0) > 0)
+                          PieChartSectionData(
+                            value: (stats['closed'] ?? 0).toDouble(),
+                            color: AppTheme.statusClosed,
+                            radius: 52,
+                            title: '',
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 20),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if ((stats['open'] ?? 0) > 0) _Dot('Open', AppTheme.statusOpen, stats['open']!),
+                    if ((stats['in_progress'] ?? 0) > 0) _Dot('In Progress', AppTheme.statusInProgress, stats['in_progress']!),
+                    if ((stats['resolved'] ?? 0) > 0) _Dot('Resolved', AppTheme.statusResolved, stats['resolved']!),
+                    if ((stats['closed'] ?? 0) > 0) _Dot('Closed', AppTheme.statusClosed, stats['closed']!),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Dot extends StatelessWidget {
+  final String label;
+  final Color color;
+  final int count;
+  const _Dot(this.label, this.color, this.count);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(3),
-            ),
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 8),
           Text(
-            '$label ($count)',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: color,
+            '$label  $count',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: context.isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary,
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildQuickActions() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Aksi Cepat',
-          style: GoogleFonts.outfit(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: ModernTheme.stone800,
-          ),
-        ),
-        const SizedBox(height: 16),
-        AppButton(
-          text: 'Buat Tiket Baru',
-          onPressed: () => context.push('/tickets/create'),
-          icon: Icons.add_rounded,
-          isGradient: true,
-        ),
-        const SizedBox(height: 12),
-        AppButton(
-          text: 'Lihat Semua Tiket',
-          onPressed: () => context.push('/tickets'),
-          icon: Icons.list_rounded,
-          type: AppButtonType.outline,
-        ),
-      ],
-    );
-  }
+// ── Ticket Row ────────────────────────────────────────────────────────────────
 
-  Widget _buildEmptyState() {
-    return Container(
-      padding: const EdgeInsets.all(48),
-      decoration: BoxDecoration(
-        color: ModernTheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: ModernTheme.stone200, width: 1),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: ModernTheme.primary.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.inbox_outlined,
-              size: 48,
-              color: ModernTheme.primary,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Belum ada tiket',
-            style: GoogleFonts.outfit(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: ModernTheme.stone800,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Mulai dengan membuat tiket pertama Anda',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              color: ModernTheme.stone500,
-            ),
-          ),
-          const SizedBox(height: 24),
-          AppButton(
-            text: 'Buat Tiket',
-            onPressed: () => context.push('/tickets/create'),
-            icon: Icons.add_rounded,
-            isGradient: true,
-            isFullWidth: false,
-          ),
-        ],
-      ),
-    );
-  }
+class _TicketRow extends StatelessWidget {
+  final String id;
+  final String title;
+  final String status;
+  final String priority;
+  final bool isDark;
+  final VoidCallback? onTap;
+  const _TicketRow({required this.id, required this.title, required this.status, required this.priority, required this.isDark, this.onTap});
 
-  Widget _buildBottomNav() {
-    final isDark = context.isDarkMode;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? ModernTheme.surfaceDark : Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: ModernTheme.stone900.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(
-                icon: Icons.dashboard_outlined,
-                activeIcon: Icons.dashboard_rounded,
-                label: 'Dashboard',
-                index: 0,
-              ),
-              _buildNavItem(
-                icon: Icons.confirmation_number_outlined,
-                activeIcon: Icons.confirmation_number_rounded,
-                label: 'Tiket',
-                index: 1,
-              ),
-              _buildNavCenterItem(),
-              _buildNavItem(
-                icon: Icons.person_outline,
-                activeIcon: Icons.person,
-                label: 'Profil',
-                index: 2,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem({
-    required IconData icon,
-    required IconData activeIcon,
-    required String label,
-    required int index,
-  }) {
-    final currentIndex = ref.watch(selectedTabProvider);
-    final isActive = currentIndex == index;
-
+  @override
+  Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        ref.read(selectedTabProvider.notifier).state = index;
-        switch (index) {
-          case 0:
-            // Already on dashboard
-            break;
-          case 1:
-            context.push('/tickets');
-            break;
-          case 2:
-            context.push('/profile');
-            break;
-        }
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isActive
-              ? ModernTheme.primary.withValues(alpha: 0.1)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
+          color: isDark ? AppTheme.dark1 : AppTheme.surface0,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              isActive ? activeIcon : icon,
-              color: isActive ? ModernTheme.primary : ModernTheme.stone400,
-              size: 22,
-            ),
-            if (isActive) ...[
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: ModernTheme.primary,
-                ),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppTheme.statusBgColor(status, isDark: isDark),
+                borderRadius: BorderRadius.circular(9),
               ),
-            ],
+              child: Icon(
+                status == 'resolved' ? Icons.check_rounded
+                    : status == 'in_progress' ? Icons.pending_rounded
+                    : status == 'closed' ? Icons.lock_outline_rounded
+                    : Icons.inbox_rounded,
+                size: 18,
+                color: AppTheme.statusColor(status),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? AppTheme.white : AppTheme.black,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '#$id',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark ? AppTheme.textTertiaryDark : AppTheme.textTertiary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            _StatusChip(status: status, isDark: isDark),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildNavCenterItem() {
-    return ScaleTransition(
-      scale: _fabAnimation,
-      child: GestureDetector(
-        onTap: () => context.push('/tickets/create'),
-        child: Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            gradient: ModernTheme.primaryGradient,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: ModernTheme.primaryGlow,
-          ),
-          child: const Icon(
-            Icons.add_rounded,
-            color: Colors.white,
-            size: 28,
+class _StatusChip extends StatelessWidget {
+  final String status;
+  final bool isDark;
+  const _StatusChip({required this.status, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppTheme.statusBgColor(status, isDark: isDark),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        AppTheme.statusLabel(status),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: AppTheme.statusColor(status),
+          letterSpacing: 0.1,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Empty ─────────────────────────────────────────────────────────────────────
+
+class _EmptyDashboard extends StatelessWidget {
+  final bool isDark;
+  const _EmptyDashboard({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: Container(
+        padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.dark1 : AppTheme.surface0,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              Icons.inbox_outlined,
+              size: 36,
+              color: isDark ? AppTheme.textTertiaryDark : AppTheme.textTertiary,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Belum ada tiket',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: isDark ? AppTheme.white : AppTheme.black,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Buat tiket pertama Anda',
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Bottom Nav ────────────────────────────────────────────────────────────────
+
+class _BottomBar extends StatelessWidget {
+  final int current;
+  final ValueChanged<int> onChanged;
+  final VoidCallback onFab;
+  final bool isDark;
+  const _BottomBar({required this.current, required this.onChanged, required this.onFab, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.dark1 : AppTheme.surface0,
+        border: Border(top: BorderSide(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 60,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _NavItem(icon: Icons.grid_view_rounded, label: 'Dashboard', active: current == 0, onTap: () => onChanged(0), isDark: isDark),
+              _NavItem(icon: Icons.list_alt_rounded, label: 'Tiket', active: current == 1, onTap: () => onChanged(1), isDark: isDark),
+              // FAB center
+              GestureDetector(
+                onTap: onFab,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.white : AppTheme.black,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.add_rounded, size: 22, color: isDark ? AppTheme.black : AppTheme.white),
+                ),
+              ),
+              _NavItem(icon: Icons.notifications_outlined, label: 'Notifikasi', active: current == 2, onTap: () => onChanged(2), isDark: isDark),
+              _NavItem(icon: Icons.person_outline_rounded, label: 'Profil', active: current == 3, onTap: () => onChanged(3), isDark: isDark),
+            ],
           ),
         ),
       ),
     );
   }
+}
 
-  String _getGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Selamat Pagi';
-    if (hour < 17) return 'Selamat Siang';
-    return 'Selamat Malam';
+class _NavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+  final bool isDark;
+  const _NavItem({required this.icon, required this.label, required this.active, required this.onTap, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = active
+        ? (isDark ? AppTheme.white : AppTheme.black)
+        : (isDark ? AppTheme.textTertiaryDark : AppTheme.textTertiary);
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 56,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 22, color: color),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
+
+// ignore: non_constant_identifier_names
+IconData bell_outlined = Icons.notifications_outlined;

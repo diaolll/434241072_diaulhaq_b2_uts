@@ -1,17 +1,12 @@
 import '../../data/repositories/ticket_repository.dart';
+import '../../data/models/ticket_model.dart';
 
 class GetTicketsUseCase {
   final TicketRepository repository;
 
   GetTicketsUseCase(this.repository);
 
-  Future<Map<String, dynamic>> call({
-    int page = 1,
-    int limit = 10,
-  }) {
-    return repository.getTickets(
-      page: page,
-      limit: limit,
-    );
+  Future<List<TicketModel>> call() {
+    return repository.getTickets();
   }
 }

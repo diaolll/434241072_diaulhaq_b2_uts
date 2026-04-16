@@ -28,16 +28,17 @@ class SupabaseService {
     required Uint8List fileBytes,
     required String contentType,
   }) async {
-    final response = await client.storage.from(bucket).uploadBinary(
-          path,
-          fileBytes,
-          fileOptions: FileOptions(contentType: contentType, upsert: false),
-        );
+    try {
+      await client.storage.from(bucket).uploadBinary(
+        path,
+        fileBytes,
+        fileOptions: FileOptions(contentType: contentType, upsert: true),
+      );
 
-    if (response.isEmpty) {
+      // Return public URL after successful upload
       return client.storage.from(bucket).getPublicUrl(path);
-    } else {
-      throw Exception('Upload failed: $response');
+    } catch (e) {
+      throw Exception('Storage upload failed: $e');
     }
   }
 
@@ -52,7 +53,7 @@ class SupabaseService {
     final response = await client.storage.from(bucket).upload(
           path,
           file,
-          fileOptions: FileOptions(contentType: contentType, upsert: false),
+          fileOptions: FileOptions(contentType: contentType, upsert: true),
         );
 
     if (response.isEmpty) {

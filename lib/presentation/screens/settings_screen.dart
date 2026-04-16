@@ -1,19 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../core/theme/modern_theme.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/services/theme_service.dart';
-import '../../../data/repositories/auth_repository.dart';
 import '../../../core/services/supabase_service.dart';
-import '../widgets/common/widgets.dart';
+import '../../../data/repositories/auth_repository.dart';
 
-/// Modern Settings Screen
-/// Features:
-/// - Theme toggle (dark/light mode)
-/// - User profile quick access
-/// - Account settings
-/// - App info and help
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -22,591 +14,319 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final _authRepo = AuthRepository();
-  final _themeService = ThemeService();
-
-  String? _userName;
-  String? _userEmail;
-  String? _userRole;
+  final _auth = AuthRepository();
+  final _theme = ThemeService();
+  String? _name, _email, _role;
 
   @override
   void initState() {
     super.initState();
-    _loadUser();
+    _load();
   }
 
-  Future<void> _loadUser() async {
-    // Try Supabase first
-    final supabaseUser = SupabaseService.currentUser;
-    if (supabaseUser != null) {
+  Future<void> _load() async {
+    final sb = SupabaseService.currentUser;
+    if (sb != null) {
       setState(() {
-        _userName = supabaseUser.userMetadata?['name'] ?? supabaseUser.email?.split('@')[0];
-        _userEmail = supabaseUser.email;
-        _userRole = supabaseUser.userMetadata?['role'] ?? 'user';
+        _name = sb.userMetadata?['name'] ?? sb.email?.split('@')[0];
+        _email = sb.email;
+        _role = sb.userMetadata?['role'] ?? 'user';
       });
       return;
     }
-
-    // Fallback to shared preferences
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _userEmail = prefs.getString('user_email');
-      _userRole = prefs.getString('user_role');
-      _userName = prefs.getString('user_name');
+      _name = prefs.getString('user_name');
+      _email = prefs.getString('user_email');
+      _role = prefs.getString('user_role');
     });
   }
 
   Future<void> _logout() async {
-    final confirmed = await showDialog<bool>(
+    final isDark = context.isDark;
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: ModernTheme.error.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                Icons.logout_rounded,
-                color: ModernTheme.error,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'Konfirmasi Keluar',
-              style: GoogleFonts.outfit(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          'Apakah Anda yakin ingin keluar dari akun?',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 15,
-            color: ModernTheme.stone600,
-          ),
-        ),
+        backgroundColor: isDark ? AppTheme.dark1 : AppTheme.surface0,
+        title: Text('Keluar?', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: isDark ? AppTheme.white : AppTheme.black)),
+        content: Text('Anda akan keluar dari akun ini.', style: TextStyle(color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'Batal',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: ModernTheme.stone600,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ModernTheme.error,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'Keluar',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Batal', style: TextStyle(color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary))),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Keluar', style: TextStyle(color: AppTheme.priorityHigh, fontWeight: FontWeight.w700))),
         ],
       ),
     );
-
-    if (confirmed == true) {
-      await _authRepo.logout();
-      await SupabaseService.client.auth.signOut();
+    if (ok == true) {
+      await _auth.logout();
+      try { await SupabaseService.client.auth.signOut(); } catch (_) {}
       if (mounted) context.go('/login');
     }
   }
 
-  void _showHelpDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: ModernTheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(Icons.help_outline, color: ModernTheme.primary),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'Panduan Penggunaan',
-              style: GoogleFonts.outfit(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _HelpItem(
-                icon: Icons.add_circle_outline,
-                title: 'Membuat Tiket Baru',
-                description: 'Klik tombol "+" di halaman tiket, isi judul, deskripsi, pilih kategori dan prioritas',
-                color: ModernTheme.primary,
-              ),
-              _HelpItem(
-                icon: Icons.list_alt,
-                title: 'Melihat Daftar Tiket',
-                description: 'Lihat semua tiket Anda di halaman tiket, filter berdasarkan status dan prioritas',
-                color: ModernTheme.info,
-              ),
-              _HelpItem(
-                icon: Icons.search,
-                title: 'Detail & Status Tiket',
-                description: 'Buka detail tiket untuk melihat perkembangan dan berkomunikasi dengan helpdesk',
-                color: ModernTheme.warning,
-              ),
-              _HelpItem(
-                icon: Icons.bar_chart,
-                title: 'Dashboard Statistik',
-                description: 'Pantau statistik tiket Anda di dashboard - total tiket, open, in progress, dan resolved',
-                color: ModernTheme.success,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'Mengerti',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: ModernTheme.primary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showPrivacyDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: ModernTheme.success.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(Icons.security, color: ModernTheme.success),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'Kebijakan Privasi',
-              style: GoogleFonts.outfit(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _PrivacyItem(
-                icon: Icons.lock,
-                text: 'Data login Anda disimpan aman dengan enkripsi',
-              ),
-              _PrivacyItem(
-                icon: Icons.verified_user,
-                text: 'Tiket hanya dapat diakses oleh Anda dan tim helpdesk',
-              ),
-              _PrivacyItem(
-                icon: Icons.cloud_upload,
-                text: 'File lampiran dienkripsi dan disimpan di cloud',
-              ),
-              _PrivacyItem(
-                icon: Icons.block,
-                text: 'Data tidak dibagikan ke pihak ketiga tanpa izin',
-              ),
-              _PrivacyItem(
-                icon: Icons.update,
-                text: 'Anda dapat memperbarui atau menghapus data kapan saja',
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'Mengerti',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: ModernTheme.primary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final isDark = context.isDark;
+
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          // Header
-          SliverAppBar(
-            expandedHeight: 140,
-            floating: false,
-            pinned: true,
-            elevation: 0,
-            backgroundColor: Colors.transparent,
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                'Pengaturan',
-                style: GoogleFonts.outfit(
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
+      backgroundColor: isDark ? AppTheme.dark0 : AppTheme.surface1,
+      appBar: AppBar(
+        backgroundColor: isDark ? AppTheme.dark0 : AppTheme.surface1,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_rounded, size: 18, color: isDark ? AppTheme.white : AppTheme.black),
+          onPressed: () => context.pop(),
+        ),
+        title: Text('Pengaturan', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: isDark ? AppTheme.white : AppTheme.black)),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
+        children: [
+          // Profile card
+          if (_email != null) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? AppTheme.dark1 : AppTheme.surface0,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
               ),
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: ModernTheme.heroGradient,
-                ),
-              ),
-            ),
-          ),
-
-          // Content
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  // User Profile Card
-                  if (_userEmail != null)
-                    ProfileCard(
-                      name: _userName ?? 'User',
-                      email: _userEmail ?? '',
-                      role: _userRole?.toUpperCase(),
-                      onTap: () => context.push('/profile'),
-                      initials: _userName?.isNotEmpty == true
-                          ? '${_userName![0].toUpperCase()}'
-                          : 'U',
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.dark3 : AppTheme.surface2,
+                      borderRadius: BorderRadius.circular(11),
                     ),
-                  const SizedBox(height: 24),
-
-                  // Appearance Section
-                  _SectionHeader(
-                    title: 'Tampilan',
-                    icon: Icons.palette_outlined,
-                  ),
-                  AppCard(
-                    type: AppCardType.filled,
-                    padding: EdgeInsets.zero,
-                    child: Column(
-                      children: [
-                        AnimatedBuilder(
-                          animation: _themeService,
-                          builder: (context, child) {
-                            final isDark = _themeService.themeMode == ThemeMode.dark;
-                            return AppSwitch(
-                              label: 'Mode Gelap',
-                              subtitle: isDark ? 'Sedang aktif' : 'Sedang nonaktif',
-                              value: isDark,
-                              onChanged: (value) {
-                                _themeService.toggleTheme();
-                              },
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Account Section
-                  _SectionHeader(
-                    title: 'Akun',
-                    icon: Icons.person_outline,
-                  ),
-                  AppCard(
-                    type: AppCardType.filled,
-                    padding: EdgeInsets.zero,
-                    child: Column(
-                      children: [
-                        MenuItemCard(
-                          icon: Icons.lock_outline_rounded,
-                          title: 'Ganti Password',
-                          onTap: () => context.push('/reset-password'),
-                        ),
-                        const Divider(height: 1),
-                        MenuItemCard(
-                          icon: Icons.badge_outlined,
-                          title: 'Role',
-                          subtitle: _userRole?.toUpperCase() ?? 'USER',
-                          showArrow: false,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // App Info Section
-                  _SectionHeader(
-                    title: 'Aplikasi',
-                    icon: Icons.info_outline,
-                  ),
-                  AppCard(
-                    type: AppCardType.filled,
-                    padding: EdgeInsets.zero,
-                    child: Column(
-                      children: [
-                        MenuItemCard(
-                          icon: Icons.new_releases_outlined,
-                          title: 'Versi Aplikasi',
-                          subtitle: '1.0.0',
-                          showArrow: false,
-                        ),
-                        const Divider(height: 1),
-                        MenuItemCard(
-                          icon: Icons.help_outline_rounded,
-                          title: 'Bantuan & Panduan',
-                          onTap: _showHelpDialog,
-                        ),
-                        const Divider(height: 1),
-                        MenuItemCard(
-                          icon: Icons.privacy_tip_outlined,
-                          title: 'Kebijakan Privasi',
-                          onTap: _showPrivacyDialog,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Logout Button
-                  AppButton(
-                    text: 'Keluar dari Akun',
-                    onPressed: _logout,
-                    type: AppButtonType.danger,
-                    icon: Icons.logout_rounded,
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Copyright
-                  Center(
-                    child: Text(
-                      '© 2024 E-Ticketing Helpdesk',
-                      style: GoogleFonts.plusJakartaSans(
-                        color: ModernTheme.stone400,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                    child: Center(
+                      child: Text(
+                        (_name?.isNotEmpty == true ? _name![0] : '?').toUpperCase(),
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: isDark ? AppTheme.white : AppTheme.black),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_name ?? 'User', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: isDark ? AppTheme.white : AppTheme.black)),
+                        Text(_email ?? '', style: TextStyle(fontSize: 12, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => context.push('/profile'),
+                    child: Text('Edit', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
+                  ),
                 ],
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+            const SizedBox(height: 20),
+          ],
 
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final IconData icon;
-
-  const _SectionHeader({
-    required this.title,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = context.isDarkMode;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
+          // Tampilan
+          _SectionLabel('TAMPILAN', isDark),
+          const SizedBox(height: 8),
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: ModernTheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
+              color: isDark ? AppTheme.dark1 : AppTheme.surface0,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
             ),
-            child: Icon(
-              icon,
-              size: 18,
-              color: ModernTheme.primary,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            title.toUpperCase(),
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: isDark ? ModernTheme.stone400 : ModernTheme.stone600,
-              letterSpacing: 1.2,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HelpItem extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String description;
-  final Color color;
-
-  const _HelpItem({
-    required this.icon,
-    required this.title,
-    required this.description,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = context.isDarkMode;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, size: 20, color: color),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Text(
-                  title,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: isDark ? ModernTheme.stone100 : ModernTheme.stone800,
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.dark2 : AppTheme.surface1,
+                    borderRadius: BorderRadius.circular(8),
                   ),
+                  child: Icon(Icons.dark_mode_outlined, size: 16, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
-                    color: ModernTheme.stone500,
-                    height: 1.4,
-                  ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text('Mode Gelap', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: isDark ? AppTheme.white : AppTheme.black)),
+                ),
+                AnimatedBuilder(
+                  animation: _theme,
+                  builder: (_, __) {
+                    final on = _theme.themeMode == ThemeMode.dark;
+                    return GestureDetector(
+                      onTap: () => _theme.toggleTheme(),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        width: 44,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: on ? (isDark ? AppTheme.white : AppTheme.black) : (isDark ? AppTheme.dark3 : AppTheme.surface3),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: AnimatedAlign(
+                          duration: const Duration(milliseconds: 180),
+                          alignment: on ? Alignment.centerRight : Alignment.centerLeft,
+                          child: Padding(
+                            padding: const EdgeInsets.all(2),
+                            child: Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                color: on ? (isDark ? AppTheme.black : AppTheme.white) : AppTheme.white,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
           ),
+          const SizedBox(height: 20),
+
+          // Akun
+          _SectionLabel('AKUN', isDark),
+          const SizedBox(height: 8),
+          _MenuCard(isDark: isDark, items: [
+            _MenuItem(icon: Icons.lock_outline_rounded, label: 'Ganti Password', isDark: isDark, onTap: () => context.push('/reset-password')),
+            _MenuItem(icon: Icons.badge_outlined, label: 'Role', value: (_role ?? 'user').toUpperCase(), isDark: isDark),
+          ]),
+          const SizedBox(height: 20),
+
+          // Aplikasi
+          _SectionLabel('APLIKASI', isDark),
+          const SizedBox(height: 8),
+          _MenuCard(isDark: isDark, items: [
+            _MenuItem(icon: Icons.new_releases_outlined, label: 'Versi', value: '1.0.0', isDark: isDark),
+            _MenuItem(icon: Icons.help_outline_rounded, label: 'Bantuan', isDark: isDark, onTap: _showHelp),
+            _MenuItem(icon: Icons.privacy_tip_outlined, label: 'Kebijakan Privasi', isDark: isDark, onTap: _showPrivacy),
+          ]),
+          const SizedBox(height: 20),
+
+          // Logout
+          GestureDetector(
+            onTap: _logout,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? AppTheme.dark1 : AppTheme.surface0,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 32, height: 32,
+                    decoration: BoxDecoration(color: const Color(0xFFFFEBEB), borderRadius: BorderRadius.circular(8)),
+                    child: const Icon(Icons.logout_rounded, size: 16, color: AppTheme.priorityHigh),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text('Keluar dari Akun', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.priorityHigh)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Center(
+            child: Text('© 2024 E-Ticketing Helpdesk', style: TextStyle(fontSize: 11, color: isDark ? AppTheme.textTertiaryDark : AppTheme.textTertiary)),
+          ),
         ],
+      ),
+    );
+  }
+
+  void _showHelp() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Bantuan', style: TextStyle(fontWeight: FontWeight.w700)),
+        content: const Text('Untuk membuat tiket, tap tombol + di halaman tiket. Isi judul, deskripsi, dan kirim.', style: TextStyle(height: 1.5)),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
+      ),
+    );
+  }
+
+  void _showPrivacy() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Kebijakan Privasi', style: TextStyle(fontWeight: FontWeight.w700)),
+        content: const Text('Data Anda disimpan aman dan tidak dibagikan ke pihak ketiga.', style: TextStyle(height: 1.5)),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
       ),
     );
   }
 }
 
-class _PrivacyItem extends StatelessWidget {
-  final IconData icon;
+class _SectionLabel extends StatelessWidget {
   final String text;
+  final bool isDark;
+  const _SectionLabel(this.text, this.isDark);
 
-  const _PrivacyItem({required this.icon, required this.text});
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? AppTheme.textTertiaryDark : AppTheme.textTertiary, letterSpacing: 0.8),
+  );
+}
+
+class _MenuCard extends StatelessWidget {
+  final bool isDark;
+  final List<_MenuItem> items;
+  const _MenuCard({required this.isDark, required this.items});
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context.isDarkMode;
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.dark1 : AppTheme.surface0,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
+      ),
+      child: Column(
+        children: List.generate(items.length, (i) => Column(children: [
+          items[i],
+          if (i < items.length - 1)
+            Divider(height: 0, thickness: 0.5, indent: 52, color: isDark ? AppTheme.dark3 : AppTheme.surface2),
+        ])),
+      ),
+    );
+  }
+}
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: ModernTheme.success.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
+class _MenuItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String? value;
+  final bool isDark;
+  final VoidCallback? onTap;
+  const _MenuItem({required this.icon, required this.label, required this.isDark, this.value, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        color: Colors.transparent,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 32, height: 32,
+              decoration: BoxDecoration(color: isDark ? AppTheme.dark2 : AppTheme.surface1, borderRadius: BorderRadius.circular(8)),
+              child: Icon(icon, size: 16, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
             ),
-            child: Icon(
-              icon,
-              size: 18,
-              color: ModernTheme.success,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
-                color: isDark ? ModernTheme.stone300 : ModernTheme.stone600,
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(child: Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: isDark ? AppTheme.white : AppTheme.black))),
+            if (value != null) Text(value!, style: TextStyle(fontSize: 13, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
+            if (onTap != null) Icon(Icons.chevron_right_rounded, size: 18, color: isDark ? AppTheme.textTertiaryDark : AppTheme.textTertiary),
+          ],
+        ),
       ),
     );
   }
