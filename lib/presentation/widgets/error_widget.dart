@@ -22,18 +22,18 @@ class ErrorWidget extends StatelessWidget {
             const Icon(
               Icons.error_outline,
               size: 64,
-              color: AppTheme.errorColor,
+              color: AppTheme.error,
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Something went wrong',
-              style: AppTheme.heading3,
+              style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 8),
             Text(
               message,
-              style: AppTheme.bodyMedium.copyWith(
-                color: AppTheme.textSecondaryColor,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppTheme.textSecondaryLight,
               ),
               textAlign: TextAlign.center,
             ),

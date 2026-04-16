@@ -1,8 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../core/theme/app_theme.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/theme/modern_theme.dart';
+import '../../../core/services/theme_service.dart';
+import '../../../data/repositories/auth_repository.dart';
+import '../../../core/services/supabase_service.dart';
+import '../widgets/common/widgets.dart';
 
+/// Modern Settings Screen
+/// Features:
+/// - Theme toggle (dark/light mode)
+/// - User profile quick access
+/// - Account settings
+/// - App info and help
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -11,10 +22,12 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final _authRepo = Supabase.instance.client.auth;
+  final _authRepo = AuthRepository();
+  final _themeService = ThemeService();
 
-  User? _currentUser;
-  bool _loading = true;
+  String? _userName;
+  String? _userEmail;
+  String? _userRole;
 
   @override
   void initState() {
@@ -23,272 +36,184 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadUser() async {
-    final user = _authRepo.currentUser;
+    // Try Supabase first
+    final supabaseUser = SupabaseService.currentUser;
+    if (supabaseUser != null) {
+      setState(() {
+        _userName = supabaseUser.userMetadata?['name'] ?? supabaseUser.email?.split('@')[0];
+        _userEmail = supabaseUser.email;
+        _userRole = supabaseUser.userMetadata?['role'] ?? 'user';
+      });
+      return;
+    }
+
+    // Fallback to shared preferences
+    final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _currentUser = user;
-      _loading = false;
+      _userEmail = prefs.getString('user_email');
+      _userRole = prefs.getString('user_role');
+      _userName = prefs.getString('user_name');
     });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Pengaturan'),
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                // User info card
-                if (_currentUser != null) ...[
-                  Card(
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        radius: 28,
-                        backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
-                        child: Text(
-                          _currentUser!.userMetadata?['name']?.substring(0, 2).toUpperCase() ?? 'U',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.primary,
-                          ),
-                        ),
-                      ),
-                      title: Text(
-                        _currentUser!.userMetadata?['name'] ?? 'User',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Text(_currentUser!.email ?? ''),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.edit_outlined),
-                        onPressed: () => context.push('/profile'),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-
-                // Appearance section
-                const SectionHeader(title: 'Tampilan'),
-                Card(
-                  child: Column(
-                    children: [
-                      SwitchListTile(
-                        title: const Text('Mode Gelap'),
-                        subtitle: Text(isDark ? 'Sedang aktif' : 'Sedang matikan'),
-                        value: isDark,
-                        onChanged: (value) {
-                          // Theme toggle requires theme management setup
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Fitur tema akan segera hadir')),
-                          );
-                        },
-                      ),
-                      const Divider(height: 1),
-                      ListTile(
-                        leading: const Icon(Icons.palette_outlined),
-                        title: const Text('Tema Aplikasi'),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Fitur tema akan segera hadir')),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Account section
-                const SectionHeader(title: 'Akun'),
-                Card(
-                  child: Column(
-                    children: [
-                      ListTile(
-                        leading: const Icon(Icons.lock_outline),
-                        title: const Text('Ganti Password'),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => context.push('/reset-password'),
-                      ),
-                      const Divider(height: 1),
-                      ListTile(
-                        leading: const Icon(Icons.description_outlined),
-                        title: const Text('Role'),
-                        subtitle: Text(_currentUser?.userMetadata?['role']?.toString().toUpperCase() ?? 'USER'),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => context.push('/profile'),
-                      ),
-                      const Divider(height: 1),
-                      ListTile(
-                        leading: const Icon(Icons.delete_outline, color: Colors.red),
-                        title: const Text('Hapus Akun', style: TextStyle(color: Colors.red)),
-                        onTap: () => _showDeleteAccountDialog(),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // App info section
-                const SectionHeader(title: 'Aplikasi'),
-                Card(
-                  child: Column(
-                    children: [
-                      const ListTile(
-                        leading: Icon(Icons.info_outline),
-                        title: Text('Versi Aplikasi'),
-                        subtitle: Text('1.0.0'),
-                      ),
-                      const Divider(height: 1),
-                      ListTile(
-                        leading: const Icon(Icons.support_agent_outlined),
-                        title: const Text('Bantuan'),
-                        onTap: () {
-                          _showHelpDialog();
-                        },
-                      ),
-                      const Divider(height: 1),
-                      ListTile(
-                        leading: const Icon(Icons.policy_outlined),
-                        title: const Text('Kebijakan Privasi'),
-                        onTap: () {
-                          _showPrivacyDialog();
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Logout button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _logout,
-                    icon: const Icon(Icons.logout),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.error,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    label: const Text('Keluar', style: TextStyle(fontSize: 16)),
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // Copyright
-                Center(
-                  child: Text(
-                    '© 2025 E-Ticketing Helpdesk',
-                    style: TextStyle(
-                      color: Colors.grey[500],
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-    );
   }
 
   Future<void> _logout() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Keluar'),
-        content: const Text('Apakah Anda yakin ingin keluar?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: ModernTheme.error.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.logout_rounded,
+                color: ModernTheme.error,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Konfirmasi Keluar',
+              style: GoogleFonts.outfit(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Apakah Anda yakin ingin keluar dari akun?',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 15,
+            color: ModernTheme.stone600,
+          ),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              'Batal',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: ModernTheme.stone600,
+              ),
+            ),
+          ),
           ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx, true);
-              await _authRepo.signOut();
-              if (mounted) context.go('/login');
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
-            child: const Text('Keluar'),
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ModernTheme.error,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              'Keluar',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
     );
 
     if (confirmed == true) {
-      await _authRepo.signOut();
+      await _authRepo.logout();
+      await SupabaseService.client.auth.signOut();
       if (mounted) context.go('/login');
     }
-  }
-
-  void _showDeleteAccountDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Hapus Akun'),
-        content: const Text(
-          'Tindakan ini akan menghapus akun Anda secara permanen. Apakah Anda yakin?',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-          ElevatedButton(
-            onPressed: () async {
-              // Delete account functionality requires backend API
-              Navigator.pop(ctx);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Fitur hapus akun akan segera hadir'),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
-            child: const Text('Hapus'),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showHelpDialog() {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Bantuan'),
-        content: const SingleChildScrollView(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: ModernTheme.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.help_outline, color: ModernTheme.primary),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Panduan Penggunaan',
+              style: GoogleFonts.outfit(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Cara Menggunakan Aplikasi:\n\n'
-                '1. Buat Tiket\n'
-                '   - Klik tombol "+" di halaman tiket\n'
-                '   - Isi form dan pilih kategori\n'
-                '   - Upload lampiran jika perlu\n\n\n'
-                '2. Track Tiket\n'
-                '   - Lihat daftar tiket di halaman tiket\n'
-                '   - Buka detail tiket untuk melihat status\n'
-                '   - Tambah komentar untuk komunikasi\n\n\n'
-                '3. Dashboard\n'
-                '   - Lihat statistik tiket Anda\n'
-                '   - Akses fitur cepat\n\n\n'
-                '4. Profil & Pengaturan\n'
-                '   - Edit profil\n'
-                '   - Ganti password\n'
-                '   - Atur mode gelap/terang\n',
-                style: TextStyle(fontSize: 14, height: 1.5),
+              _HelpItem(
+                icon: Icons.add_circle_outline,
+                title: 'Membuat Tiket Baru',
+                description: 'Klik tombol "+" di halaman tiket, isi judul, deskripsi, pilih kategori dan prioritas',
+                color: ModernTheme.primary,
+              ),
+              _HelpItem(
+                icon: Icons.list_alt,
+                title: 'Melihat Daftar Tiket',
+                description: 'Lihat semua tiket Anda di halaman tiket, filter berdasarkan status dan prioritas',
+                color: ModernTheme.info,
+              ),
+              _HelpItem(
+                icon: Icons.search,
+                title: 'Detail & Status Tiket',
+                description: 'Buka detail tiket untuk melihat perkembangan dan berkomunikasi dengan helpdesk',
+                color: ModernTheme.warning,
+              ),
+              _HelpItem(
+                icon: Icons.bar_chart,
+                title: 'Dashboard Statistik',
+                description: 'Pantau statistik tiket Anda di dashboard - total tiket, open, in progress, dan resolved',
+                color: ModernTheme.success,
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Mengerti')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              'Mengerti',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: ModernTheme.primary,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -298,49 +223,390 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Kebijakan Privasi'),
-        content: const SingleChildScrollView(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: ModernTheme.success.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.security, color: ModernTheme.success),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Kebijakan Privasi',
+              style: GoogleFonts.outfit(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Kami menghargai privasi data Anda:\n\n'
-                '• Email dan password disimpan aman\n'
-                '• Data tiket hanya diakses oleh user yang berwenang\n'
-                '• File lampiran dienkripsi dengan aman\n'
-                '• Kami tidak akan membagikan data Anda ke pihak ketiga tanpa izin\n\n'
-                'Untuk informasi lebih lanjut, hubungi: support@eticketing.com',
-                style: TextStyle(fontSize: 14, height: 1.5),
+              _PrivacyItem(
+                icon: Icons.lock,
+                text: 'Data login Anda disimpan aman dengan enkripsi',
+              ),
+              _PrivacyItem(
+                icon: Icons.verified_user,
+                text: 'Tiket hanya dapat diakses oleh Anda dan tim helpdesk',
+              ),
+              _PrivacyItem(
+                icon: Icons.cloud_upload,
+                text: 'File lampiran dienkripsi dan disimpan di cloud',
+              ),
+              _PrivacyItem(
+                icon: Icons.block,
+                text: 'Data tidak dibagikan ke pihak ketiga tanpa izin',
+              ),
+              _PrivacyItem(
+                icon: Icons.update,
+                text: 'Anda dapat memperbarui atau menghapus data kapan saja',
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Mengerti')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              'Mengerti',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: ModernTheme.primary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: CustomScrollView(
+        slivers: [
+          // Header
+          SliverAppBar(
+            expandedHeight: 140,
+            floating: false,
+            pinned: true,
+            elevation: 0,
+            backgroundColor: Colors.transparent,
+            flexibleSpace: FlexibleSpaceBar(
+              title: Text(
+                'Pengaturan',
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+              background: Container(
+                decoration: BoxDecoration(
+                  gradient: ModernTheme.heroGradient,
+                ),
+              ),
+            ),
+          ),
+
+          // Content
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // User Profile Card
+                  if (_userEmail != null)
+                    ProfileCard(
+                      name: _userName ?? 'User',
+                      email: _userEmail ?? '',
+                      role: _userRole?.toUpperCase(),
+                      onTap: () => context.push('/profile'),
+                      initials: _userName?.isNotEmpty == true
+                          ? '${_userName![0].toUpperCase()}'
+                          : 'U',
+                    ),
+                  const SizedBox(height: 24),
+
+                  // Appearance Section
+                  _SectionHeader(
+                    title: 'Tampilan',
+                    icon: Icons.palette_outlined,
+                  ),
+                  AppCard(
+                    type: AppCardType.filled,
+                    padding: EdgeInsets.zero,
+                    child: Column(
+                      children: [
+                        AnimatedBuilder(
+                          animation: _themeService,
+                          builder: (context, child) {
+                            final isDark = _themeService.themeMode == ThemeMode.dark;
+                            return AppSwitch(
+                              label: 'Mode Gelap',
+                              subtitle: isDark ? 'Sedang aktif' : 'Sedang nonaktif',
+                              value: isDark,
+                              onChanged: (value) {
+                                _themeService.toggleTheme();
+                              },
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Account Section
+                  _SectionHeader(
+                    title: 'Akun',
+                    icon: Icons.person_outline,
+                  ),
+                  AppCard(
+                    type: AppCardType.filled,
+                    padding: EdgeInsets.zero,
+                    child: Column(
+                      children: [
+                        MenuItemCard(
+                          icon: Icons.lock_outline_rounded,
+                          title: 'Ganti Password',
+                          onTap: () => context.push('/reset-password'),
+                        ),
+                        const Divider(height: 1),
+                        MenuItemCard(
+                          icon: Icons.badge_outlined,
+                          title: 'Role',
+                          subtitle: _userRole?.toUpperCase() ?? 'USER',
+                          showArrow: false,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // App Info Section
+                  _SectionHeader(
+                    title: 'Aplikasi',
+                    icon: Icons.info_outline,
+                  ),
+                  AppCard(
+                    type: AppCardType.filled,
+                    padding: EdgeInsets.zero,
+                    child: Column(
+                      children: [
+                        MenuItemCard(
+                          icon: Icons.new_releases_outlined,
+                          title: 'Versi Aplikasi',
+                          subtitle: '1.0.0',
+                          showArrow: false,
+                        ),
+                        const Divider(height: 1),
+                        MenuItemCard(
+                          icon: Icons.help_outline_rounded,
+                          title: 'Bantuan & Panduan',
+                          onTap: _showHelpDialog,
+                        ),
+                        const Divider(height: 1),
+                        MenuItemCard(
+                          icon: Icons.privacy_tip_outlined,
+                          title: 'Kebijakan Privasi',
+                          onTap: _showPrivacyDialog,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Logout Button
+                  AppButton(
+                    text: 'Keluar dari Akun',
+                    onPressed: _logout,
+                    type: AppButtonType.danger,
+                    icon: Icons.logout_rounded,
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Copyright
+                  Center(
+                    child: Text(
+                      '© 2024 E-Ticketing Helpdesk',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: ModernTheme.stone400,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class SectionHeader extends StatelessWidget {
+class _SectionHeader extends StatelessWidget {
   final String title;
+  final IconData icon;
 
-  const SectionHeader({super.key, required this.title});
+  const _SectionHeader({
+    required this.title,
+    required this.icon,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final isDark = context.isDarkMode;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Text(
-        title.toUpperCase(),
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          color: AppTheme.textSecondaryColor,
-          letterSpacing: 1,
-        ),
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: ModernTheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              icon,
+              size: 18,
+              color: ModernTheme.primary,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            title.toUpperCase(),
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: isDark ? ModernTheme.stone400 : ModernTheme.stone600,
+              letterSpacing: 1.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HelpItem extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String description;
+  final Color color;
+
+  const _HelpItem({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = context.isDarkMode;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 20, color: color),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? ModernTheme.stone100 : ModernTheme.stone800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    color: ModernTheme.stone500,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PrivacyItem extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _PrivacyItem({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = context.isDarkMode;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: ModernTheme.success.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              icon,
+              size: 18,
+              color: ModernTheme.success,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                color: isDark ? ModernTheme.stone300 : ModernTheme.stone600,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

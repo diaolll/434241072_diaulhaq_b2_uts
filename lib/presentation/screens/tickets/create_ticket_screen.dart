@@ -1,11 +1,15 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
-import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/modern_theme.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../data/repositories/ticket_repository.dart';
+import '../../widgets/common/app_button.dart';
+import '../../widgets/common/app_input.dart';
+import '../../widgets/common/app_card.dart';
 
 class CreateTicketScreen extends StatefulWidget {
   const CreateTicketScreen({super.key});
@@ -38,13 +42,6 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
     'medium': 'Sedang',
     'high': 'Tinggi',
     'critical': 'Kritis',
-  };
-
-  final Map<String, Color> _priorityColors = {
-    'low': Colors.green,
-    'medium': Colors.orange,
-    'high': Colors.red,
-    'critical': const Color(0xFF7F1D1D),
   };
 
   String? _subCategory;
@@ -141,9 +138,23 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Tiket berhasil dibuat'),
-            backgroundColor: AppTheme.success,
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 12),
+                Text(
+                  'Tiket berhasil dibuat',
+                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+            backgroundColor: ModernTheme.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.all(16),
           ),
         );
         context.pop();
@@ -152,8 +163,24 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Gagal membuat tiket: $e'),
-            backgroundColor: AppTheme.error,
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Gagal membuat tiket: $e',
+                    style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: ModernTheme.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.all(16),
           ),
         );
       }
@@ -187,15 +214,21 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Info Card
+              InfoCard(
+                title: 'Informasi Tiket',
+                description: 'Lengkapi formulir di bawah untuk membuat tiket bantuan',
+                icon: Icons.info_outline,
+                iconColor: ModernTheme.info,
+              ),
+              const SizedBox(height: 24),
+
               // Title
-              TextFormField(
+              AppInput(
                 controller: _titleCtrl,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  labelText: 'Judul Tiket *',
-                  prefixIcon: Icon(Icons.title),
-                  hintText: 'Contoh: Printer lantai 2 tidak berfungsi',
-                ),
+                label: 'Judul Tiket *',
+                hint: 'Contoh: Printer lantai 2 tidak berfungsi',
+                prefixIcon: Icons.title_rounded,
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Judul wajib diisi';
                   if (v.trim().length < 5) return 'Minimal 5 karakter';
@@ -205,15 +238,13 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
               const SizedBox(height: 16),
 
               // Description
-              TextFormField(
+              AppInput(
                 controller: _descCtrl,
+                label: 'Deskripsi Masalah *',
+                hint: 'Jelaskan masalah secara detail',
+                prefixIcon: Icons.description_outlined,
+                type: AppInputType.multiline,
                 maxLines: 5,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  labelText: 'Deskripsi Masalah *',
-                  prefixIcon: Icon(Icons.description),
-                  hintText: 'Jelaskan masalah secara detail',
-                ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Deskripsi wajib diisi';
                   if (v.trim().length < 10) return 'Minimal 10 karakter';
@@ -223,24 +254,20 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
               const SizedBox(height: 16),
 
               // Location (Optional)
-              TextFormField(
+              AppInput(
                 controller: _locationCtrl,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  labelText: 'Lokasi',
-                  prefixIcon: Icon(Icons.location_on_outlined),
-                  hintText: 'Contoh: Lantai 2, Ruang Meeting',
-                ),
+                label: 'Lokasi',
+                hint: 'Contoh: Lantai 2, Ruang Meeting',
+                prefixIcon: Icons.location_on_outlined,
               ),
               const SizedBox(height: 16),
 
               // Category
-              DropdownButtonFormField<String>(
+              AppDropdown<String>(
+                label: 'Kategori Utama *',
+                hint: 'Pilih kategori',
                 initialValue: _category,
-                decoration: const InputDecoration(
-                  labelText: 'Kategori Utama *',
-                  prefixIcon: Icon(Icons.category),
-                ),
+                prefixIcon: Icons.category_rounded,
                 items: _categories.keys.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                 onChanged: (v) {
                   setState(() {
@@ -253,12 +280,11 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
 
               // Sub Category
               if (_subCategories.isNotEmpty) ...[
-                DropdownButtonFormField<String>(
+                AppDropdown<String>(
+                  label: 'Sub Kategori *',
+                  hint: 'Pilih sub kategori',
                   initialValue: _subCategory,
-                  decoration: const InputDecoration(
-                    labelText: 'Sub Kategori *',
-                    prefixIcon: Icon(Icons.subdirectory_arrow_left),
-                  ),
+                  prefixIcon: Icons.subdirectory_arrow_left_rounded,
                   items: _subCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                   onChanged: (v) => setState(() => _subCategory = v),
                   validator: (v) => v == null ? 'Pilih sub kategori' : null,
@@ -267,179 +293,261 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
               ],
 
               // Priority
-              const Text('Prioritas', style: TextStyle(fontWeight: FontWeight.w500)),
-              const SizedBox(height: 8),
+              const Text(
+                'Prioritas',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+              ),
+              const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: _priorityLabels.entries.map((entry) {
                   final key = entry.key;
                   final label = entry.value;
-                  final color = _priorityColors[key] ?? Colors.grey;
-                  return ChoiceChip(
-                    label: Text(label),
-                    selected: _priority == key,
-                    selectedColor: color.withValues(alpha: 0.2),
-                    labelStyle: TextStyle(
-                      color: _priority == key ? color : AppTheme.textSecondaryColor,
-                      fontWeight: _priority == key ? FontWeight.bold : FontWeight.normal,
+                  final isSelected = _priority == key;
+                  final color = ModernTheme.getPriorityColor(key);
+                  return InkWell(
+                    onTap: () => setState(() => _priority = key),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isSelected ? color : ModernTheme.surface,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: color,
+                          width: isSelected ? 2 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _getPriorityIcon(key),
+                            size: 16,
+                            color: isSelected ? Colors.white : color,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            label,
+                            style: TextStyle(
+                              color: isSelected ? Colors.white : color,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    side: BorderSide(color: color),
-                    onSelected: (_) => setState(() => _priority = key),
                   );
                 }).toList(),
               ),
               const SizedBox(height: 24),
 
               // Attachments Section
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey[300]!),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Lampiran (Opsional)', style: TextStyle(fontWeight: FontWeight.w500)),
-                        if (_files.isNotEmpty)
-                          Text('${_files.length} file', style: const TextStyle(color: AppTheme.textSecondaryColor, fontSize: 12)),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: _loading || _uploading ? null : () => _pickImage(ImageSource.camera),
-                          icon: const Icon(Icons.camera_alt, size: 18),
-                          label: const Text('Kamera'),
-                          style: OutlinedButton.styleFrom(minimumSize: const Size(90, 36)),
-                        ),
-                        const SizedBox(width: 8),
-                        OutlinedButton.icon(
-                          onPressed: _loading || _uploading ? null : () => _pickImage(ImageSource.gallery),
-                          icon: const Icon(Icons.photo_library, size: 18),
-                          label: const Text('Galeri'),
-                          style: OutlinedButton.styleFrom(minimumSize: const Size(90, 36)),
-                        ),
-                        const SizedBox(width: 8),
-                        OutlinedButton.icon(
-                          onPressed: _loading || _uploading ? null : _pickFile,
-                          icon: const Icon(Icons.attach_file, size: 18),
-                          label: const Text('File'),
-                          style: OutlinedButton.styleFrom(minimumSize: const Size(90, 36)),
-                        ),
-                      ],
-                    ),
-                    if (_files.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      const Divider(),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        height: 90,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _files.length,
-                          itemBuilder: (_, i) {
-                            final file = _files[i];
-                            final isImage = file.path.endsWith('.jpg') ||
-                                file.path.endsWith('.jpeg') ||
-                                file.path.endsWith('.png');
-                            return Container(
-                              width: 90,
-                              margin: const EdgeInsets.only(right: 8),
-                              child: Stack(
-                                children: [
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      border: Border.all(color: Colors.grey[300]!),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(7),
-                                      child: isImage
-                                          ? Image.file(file, fit: BoxFit.cover, width: 88, height: 88)
-                                          : Container(
-                                              width: 88,
-                                              height: 88,
-                                              padding: const EdgeInsets.all(8),
-                                              child: Center(
-                                                child: Text(
-                                                  file.path.split('/').last,
-                                                  textAlign: TextAlign.center,
-                                                  style: const TextStyle(fontSize: 10),
-                                                  maxLines: 2,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                            ),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    top: 4,
-                                    right: 4,
-                                    child: GestureDetector(
-                                      onTap: () => _removeFile(i),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: const BoxDecoration(
-                                          color: Colors.red,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(Icons.close, size: 14, color: Colors.white),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+              _buildAttachmentsSection(),
               const SizedBox(height: 24),
 
               // Submit Button
-              ElevatedButton(
+              AppButton(
+                text: _uploading ? 'Mengunggah...' : _loading ? 'Memproses...' : 'Kirim Tiket',
                 onPressed: (_loading || _uploading) ? null : _submit,
-                child: _uploading
-                    ? const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                          ),
-                          SizedBox(width: 8),
-                          Text('Mengunggah...'),
-                        ],
-                      )
-                    : _loading
-                        ? const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                              ),
-                              SizedBox(width: 8),
-                              Text('Memproses...'),
-                            ],
-                          )
-                        : const Text('Kirim Tiket', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                isLoading: _loading || _uploading,
+                isGradient: true,
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildAttachmentsSection() {
+    final isDark = context.isDarkMode;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? ModernTheme.surfaceDarkElevated : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: ModernTheme.stone200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Lampiran',
+                style: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                  color: isDark ? ModernTheme.stone100 : ModernTheme.stone800,
+                ),
+              ),
+              if (_files.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: ModernTheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${_files.length} file',
+                    style: GoogleFonts.plusJakartaSans(
+                      color: ModernTheme.primary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Tambahkan gambar atau dokumen terkait',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              color: ModernTheme.stone500,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: (_loading || _uploading) ? null : () => _pickImage(ImageSource.camera),
+                  icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                  label: Text(
+                    'Kamera',
+                    style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 44),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: (_loading || _uploading) ? null : () => _pickImage(ImageSource.gallery),
+                  icon: const Icon(Icons.photo_library_outlined, size: 18),
+                  label: Text(
+                    'Galeri',
+                    style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 44),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: (_loading || _uploading) ? null : _pickFile,
+                  icon: const Icon(Icons.attach_file_rounded, size: 18),
+                  label: Text(
+                    'File',
+                    style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 44),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (_files.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 90,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: _files.length,
+                itemBuilder: (_, i) {
+                  final file = _files[i];
+                  final isImage = file.path.endsWith('.jpg') ||
+                      file.path.endsWith('.jpeg') ||
+                      file.path.endsWith('.png');
+                  return Container(
+                    width: 90,
+                    margin: const EdgeInsets.only(right: 12),
+                    child: Stack(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(color: ModernTheme.stone300),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(11),
+                            child: isImage
+                                ? Image.file(file, fit: BoxFit.cover, width: 88, height: 88)
+                                : Container(
+                                    width: 88,
+                                    height: 88,
+                                    padding: const EdgeInsets.all(8),
+                                    child: Center(
+                                      child: Text(
+                                        file.path.split('/').last,
+                                        textAlign: TextAlign.center,
+                                        style: GoogleFonts.plusJakartaSans(fontSize: 10),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 6,
+                          right: 6,
+                          child: GestureDetector(
+                            onTap: () => _removeFile(i),
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: ModernTheme.error,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.close, size: 14, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  IconData _getPriorityIcon(String priority) {
+    switch (priority) {
+      case 'low':
+        return Icons.arrow_downward_rounded;
+      case 'medium':
+        return Icons.remove_rounded;
+      case 'high':
+        return Icons.arrow_upward_rounded;
+      case 'critical':
+        return Icons.priority_high_rounded;
+      default:
+        return Icons.help_outline;
+    }
   }
 }

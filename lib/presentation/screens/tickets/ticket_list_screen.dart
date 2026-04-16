@@ -1,214 +1,122 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shimmer/shimmer.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../data/models/ticket_model.dart';
-import '../../../data/repositories/ticket_repository.dart';
-import '../../../core/theme/app_theme.dart';
-import 'package:intl/intl.dart';
+import '../../../data/providers/providers.dart';
+import '../../../core/theme/modern_theme.dart';
+import '../../widgets/common/widgets.dart';
 
-class TicketListScreen extends StatefulWidget {
+class TicketListScreen extends ConsumerStatefulWidget {
   const TicketListScreen({super.key});
 
   @override
-  State<TicketListScreen> createState() => _TicketListScreenState();
+  ConsumerState<TicketListScreen> createState() => _TicketListScreenState();
 }
 
-class _TicketListScreenState extends State<TicketListScreen> {
-  final _repo = TicketRepository();
+class _TicketListScreenState extends ConsumerState<TicketListScreen> {
   final _scrollCtrl = ScrollController();
-  final List<TicketModel> _tickets = [];
-  bool _loading = true;
-  bool _loadingMore = false;
-  int _page = 1;
-  int _total = 0;
-  static const _limit = 10;
+  final _searchCtrl = TextEditingController();
 
   // Filter options
   String? _filterStatus;
   String? _filterPriority;
-  String? _filterCategory;
   bool _showFilters = false;
-
-  // User role
-  String? _userRole;
 
   final List<String> _statusOptions = ['open', 'in_progress', 'resolved', 'closed'];
   final List<String> _priorityOptions = ['low', 'medium', 'high', 'critical'];
-  final List<String> _categoryOptions = ['Hardware', 'Software', 'Network', 'Email', 'Access', 'Facility', 'HR', 'Finance', 'Lainnya'];
 
   @override
   void initState() {
     super.initState();
-    _loadUserRole();
-    _loadTickets();
     _scrollCtrl.addListener(_onScroll);
   }
 
   @override
   void dispose() {
     _scrollCtrl.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _loadUserRole() async {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user != null) {
-      // Get user role from user metadata or profiles table
-      final role = user.userMetadata?['role'];
-      setState(() => _userRole = role);
-    }
-  }
-
-  bool get _isAdminOrHelpdesk => _userRole == 'admin' || _userRole == 'helpdesk';
-
   void _onScroll() {
-    if (_scrollCtrl.position.pixels >= _scrollCtrl.position.maxScrollExtent - 200) {
-      if (!_loadingMore && _tickets.length < _total) {
-        _loadMore();
-      }
-    }
-  }
-
-  Future<void> _loadTickets() async {
-    setState(() { _loading = true; _page = 1; _tickets.clear(); });
-    try {
-      final res = await _repo.getTickets(page: 1, limit: _limit);
-      setState(() {
-        _tickets.addAll(res['tickets'] as List<TicketModel>);
-        _total = res['total'];
-        _loading = false;
-      });
-    } catch (_) {
-      setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _loadMore() async {
-    setState(() => _loadingMore = true);
-    _page++;
-    try {
-      final res = await _repo.getTickets(page: _page, limit: _limit);
-      setState(() {
-        _tickets.addAll(res['tickets'] as List<TicketModel>);
-        _loadingMore = false;
-      });
-    } catch (_) {
-      setState(() { _loadingMore = false; _page--; });
-    }
+    // Infinite scroll can be implemented here
   }
 
   void _clearFilters() {
     setState(() {
       _filterStatus = null;
       _filterPriority = null;
-      _filterCategory = null;
+      _searchCtrl.clear();
     });
-    _loadTickets();
+    ref.read(searchQueryProvider.notifier).state = '';
+  }
+
+  bool get _hasActiveFilter => _filterStatus != null || _filterPriority != null || _searchCtrl.text.isNotEmpty;
+
+  List<TicketModel> _getFilteredTickets(List<TicketModel> allTickets) {
+    var filtered = allTickets;
+
+    if (_filterStatus != null) {
+      filtered = filtered.where((t) => t.status == _filterStatus).toList();
+    }
+
+    if (_filterPriority != null) {
+      filtered = filtered.where((t) => t.priority == _filterPriority).toList();
+    }
+
+    return filtered;
   }
 
   @override
   Widget build(BuildContext context) {
+    final ticketsState = ref.watch(ticketsProvider);
+    final allTickets = ticketsState.tickets;
+    final filteredTickets = _getFilteredTickets(allTickets);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Daftar Tiket'),
         actions: [
-          if (_isAdminOrHelpdesk)
-            IconButton(
-              icon: Icon(_showFilters ? Icons.filter_list_off : Icons.filter_list),
-              onPressed: () => setState(() => _showFilters = !_showFilters),
-              tooltip: 'Filter',
-            ),
+          IconButton(
+            icon: Icon(_showFilters ? Icons.filter_list_off : Icons.filter_list_rounded),
+            onPressed: () => setState(() => _showFilters = !_showFilters),
+            tooltip: 'Filter',
+          ),
         ],
       ),
       body: Column(
         children: [
-          // Filter Panel
-          if (_showFilters && _isAdminOrHelpdesk)
-            Container(
-              padding: const EdgeInsets.all(16),
-              color: AppTheme.primary.withValues(alpha: 0.05),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Filter Tiket', style: TextStyle(fontWeight: FontWeight.bold)),
-                      TextButton(
-                        onPressed: _clearFilters,
-                        child: const Text('Reset'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  // Status Filter
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      const Text('Status: ', style: TextStyle(fontWeight: FontWeight.w500)),
-                      ..._statusOptions.map((status) => FilterChip(
-                        label: Text(status.replaceAll('_', ' ').toUpperCase()),
-                        selected: _filterStatus == status,
-                        onSelected: (v) => setState(() => _filterStatus = v ? status : null),
-                        selectedColor: AppTheme.statusColor(status).withValues(alpha: 0.3),
-                        checkmarkColor: AppTheme.statusColor(status),
-                      )),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  // Priority Filter
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      const Text('Prioritas: ', style: TextStyle(fontWeight: FontWeight.w500)),
-                      ..._priorityOptions.map((priority) => FilterChip(
-                        label: Text(priority.toUpperCase()),
-                        selected: _filterPriority == priority,
-                        onSelected: (v) => setState(() => _filterPriority = v ? priority : null),
-                        selectedColor: AppTheme.priorityColor(priority).withValues(alpha: 0.3),
-                        checkmarkColor: AppTheme.priorityColor(priority),
-                      )),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  // Category Filter
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      const Text('Kategori: ', style: TextStyle(fontWeight: FontWeight.w500)),
-                      ..._categoryOptions.map((category) => FilterChip(
-                        label: Text(category),
-                        selected: _filterCategory == category,
-                        onSelected: (v) => setState(() => _filterCategory = v ? category : null),
-                        selectedColor: AppTheme.primary.withValues(alpha: 0.3),
-                        checkmarkColor: AppTheme.primary,
-                      )),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+          // Search & Filter Panel
+          if (_showFilters)
+            _buildFilterPanel()
+          else
+            _buildSearchBar(),
+
           // Ticket List
           Expanded(
-            child: _loading
+            child: ticketsState.isLoading
                 ? _buildShimmer()
                 : RefreshIndicator(
-                    onRefresh: _loadTickets,
-                    child: _tickets.isEmpty
-                        ? _EmptyState(onClear: _filterStatus != null || _filterPriority != null || _filterCategory != null ? _clearFilters : null)
+                    onRefresh: () => ref.read(ticketsProvider.notifier).refresh(),
+                    color: ModernTheme.primary,
+                    backgroundColor: context.isDarkMode ? ModernTheme.surfaceDarkElevated : Colors.white,
+                    child: filteredTickets.isEmpty
+                        ? _buildEmptyState()
                         : ListView.builder(
                             controller: _scrollCtrl,
-                            padding: const EdgeInsets.all(16),
-                            itemCount: _tickets.length + (_loadingMore ? 1 : 0),
+                            padding: const EdgeInsets.only(bottom: 80),
+                            itemCount: filteredTickets.length,
                             itemBuilder: (ctx, i) {
-                              if (i == _tickets.length) {
-                                return const Center(child: CircularProgressIndicator());
-                              }
-                              return _TicketCard(ticket: _tickets[i]);
+                              return TicketCard(
+                                ticketId: filteredTickets[i].ticketNo,
+                                title: filteredTickets[i].title,
+                                status: filteredTickets[i].status,
+                                priority: filteredTickets[i].priority,
+                                category: filteredTickets[i].category,
+                                createdAt: filteredTickets[i].createdAt,
+                                onTap: () => context.push('/tickets/${filteredTickets[i].id}'),
+                              );
                             },
                           ),
                   ),
@@ -217,166 +125,206 @@ class _TicketListScreenState extends State<TicketListScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/tickets/create'),
-        icon: const Icon(Icons.add),
-        label: const Text('Buat Tiket'),
+        icon: const Icon(Icons.add_rounded),
+        label: Text(
+          'Buat Tiket',
+          style: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        backgroundColor: ModernTheme.primary,
+        foregroundColor: Colors.white,
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    final isDark = context.isDarkMode;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: TextField(
+        controller: _searchCtrl,
+        style: GoogleFonts.plusJakartaSans(
+          fontSize: 15,
+          color: isDark ? ModernTheme.stone100 : ModernTheme.stone800,
+        ),
+        decoration: InputDecoration(
+          hintText: 'Cari tiket...',
+          hintStyle: GoogleFonts.plusJakartaSans(
+            color: ModernTheme.stone400,
+            fontSize: 15,
+          ),
+          prefixIcon: const Icon(Icons.search),
+          suffixIcon: _searchCtrl.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _searchCtrl.clear();
+                    _clearFilters();
+                  },
+                )
+              : null,
+          filled: true,
+          fillColor: isDark ? const Color(0xFF292524) : ModernTheme.stone100.withValues(alpha: 0.5),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        ),
+        onChanged: (value) {
+          ref.read(searchQueryProvider.notifier).state = value;
+        },
+      ),
+    );
+  }
+
+  Widget _buildFilterPanel() {
+    final isDark = context.isDarkMode;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: ModernTheme.primary.withValues(alpha: 0.05),
+        border: Border(
+          bottom: BorderSide(color: ModernTheme.stone200, width: 1),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Filter Tiket',
+                style: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  color: isDark ? ModernTheme.stone100 : ModernTheme.stone800,
+                ),
+              ),
+              if (_hasActiveFilter)
+                TextButton(
+                  onPressed: _clearFilters,
+                  child: Text(
+                    'Reset Semua',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w600,
+                      color: ModernTheme.primary,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Status Filter
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Status',
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                color: isDark ? ModernTheme.stone400 : ModernTheme.stone600,
+              ),
+            ),
+          ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _statusOptions.map((status) {
+              final isSelected = _filterStatus == status;
+              final statusColor = ModernTheme.getStatusColor(status);
+              return InkWell(
+                onTap: () => setState(() => _filterStatus = isSelected ? null : status),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? statusColor : (isDark ? ModernTheme.surfaceDarkElevated : Colors.white),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected ? statusColor : ModernTheme.stone300,
+                    ),
+                  ),
+                  child: Text(
+                    ModernTheme.getStatusLabel(status),
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: isSelected ? Colors.white : ModernTheme.stone600,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+
+          // Priority Filter
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Prioritas',
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                color: isDark ? ModernTheme.stone400 : ModernTheme.stone600,
+              ),
+            ),
+          ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _priorityOptions.map((priority) {
+              final isSelected = _filterPriority == priority;
+              final priorityColor = ModernTheme.getPriorityColor(priority);
+              return InkWell(
+                onTap: () => setState(() => _filterPriority = isSelected ? null : priority),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? priorityColor : (isDark ? ModernTheme.surfaceDarkElevated : Colors.white),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected ? priorityColor : ModernTheme.stone300,
+                    ),
+                  ),
+                  child: Text(
+                    ModernTheme.getPriorityLabel(priority),
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: isSelected ? Colors.white : ModernTheme.stone600,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildShimmer() {
-    return Shimmer.fromColors(
-      baseColor: Colors.grey[300]!,
-      highlightColor: Colors.grey[100]!,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: 5,
-        itemBuilder: (_, __) => Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          height: 100,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      ),
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: 5,
+      itemBuilder: (_, __) => const TicketCardShimmer(),
     );
   }
-}
 
-class _EmptyState extends StatelessWidget {
-  final VoidCallback? onClear;
-  const _EmptyState({this.onClear});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[400]),
-          const SizedBox(height: 16),
-          Text(
-            onClear != null ? 'Tidak ada tiket dengan filter ini' : 'Belum ada tiket',
-            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-          ),
-          if (onClear != null) ...[
-            const SizedBox(height: 8),
-            TextButton(onPressed: onClear, child: const Text('Hapus Filter')),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _TicketCard extends StatelessWidget {
-  final TicketModel ticket;
-  const _TicketCard({required this.ticket});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => context.push('/tickets/${ticket.id}'),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      ticket.title,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  _StatusBadge(ticket.status),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                ticket.description,
-                style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Text(ticket.ticketNo, style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Colors.blue)),
-                  const SizedBox(width: 8),
-                  if (ticket.category != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        ticket.category!,
-                        style: const TextStyle(fontSize: 10, color: Colors.grey),
-                      ),
-                    ),
-                  const Spacer(),
-                  _PriorityBadge(ticket.priority),
-                  const SizedBox(width: 8),
-                  Text(
-                    DateFormat('dd MMM yyyy').format(ticket.createdAt),
-                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  final String status;
-  const _StatusBadge(this.status);
-
-  String get _label => status.replaceAll('_', ' ').toUpperCase();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppTheme.statusColor(status).withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        _label,
-        style: TextStyle(color: AppTheme.statusColor(status), fontSize: 10, fontWeight: FontWeight.bold),
-      ),
-    );
-  }
-}
-
-class _PriorityBadge extends StatelessWidget {
-  final String priority;
-  const _PriorityBadge(this.priority);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: AppTheme.priorityColor(priority).withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        priority.toUpperCase(),
-        style: TextStyle(color: AppTheme.priorityColor(priority), fontSize: 10, fontWeight: FontWeight.bold),
-      ),
+  Widget _buildEmptyState() {
+    return EmptyState(
+      title: _hasActiveFilter ? 'Tidak ada tiket dengan filter ini' : 'Belum ada tiket',
+      subtitle: _hasActiveFilter ? 'Coba ubah atau hapus filter' : 'Buat tiket pertama Anda sekarang',
+      icon: _hasActiveFilter ? Icons.filter_list_off : Icons.confirmation_number_outlined,
+      actionLabel: _hasActiveFilter ? 'Hapus Filter' : 'Buat Tiket',
+      onAction: _hasActiveFilter ? _clearFilters : () => context.push('/tickets/create'),
+      type: _hasActiveFilter ? EmptyStateType.noSearchResults : EmptyStateType.noTickets,
     );
   }
 }

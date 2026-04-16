@@ -16,15 +16,15 @@ class TicketCardWidget extends StatelessWidget {
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'open':
-        return AppTheme.errorColor;
+        return AppTheme.error;
       case 'in_progress':
-        return AppTheme.warningColor;
+        return AppTheme.warning;
       case 'resolved':
-        return AppTheme.successColor;
+        return AppTheme.success;
       case 'closed':
-        return AppTheme.textSecondaryColor;
+        return AppTheme.textSecondaryLight;
       default:
-        return AppTheme.textSecondaryColor;
+        return AppTheme.textSecondaryLight;
     }
   }
 
@@ -37,7 +37,7 @@ class TicketCardWidget extends StatelessWidget {
       case 'low':
         return Colors.green;
       default:
-        return AppTheme.textSecondaryColor;
+        return AppTheme.textSecondaryLight;
     }
   }
 
@@ -56,6 +56,7 @@ class TicketCardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
@@ -113,8 +114,8 @@ class TicketCardWidget extends StatelessWidget {
                   const Spacer(),
                   Text(
                     '#${ticket.id}',
-                    style: AppTheme.bodySmall.copyWith(
-                      color: AppTheme.textSecondaryColor,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: AppTheme.textSecondaryLight,
                     ),
                   ),
                 ],
@@ -122,7 +123,7 @@ class TicketCardWidget extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 ticket.title,
-                style: AppTheme.heading3,
+                style: textTheme.headlineSmall,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -130,8 +131,8 @@ class TicketCardWidget extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   ticket.description,
-                  style: AppTheme.bodySmall.copyWith(
-                    color: AppTheme.textSecondaryColor,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondaryLight,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -140,18 +141,18 @@ class TicketCardWidget extends StatelessWidget {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  const Icon(Icons.category_outlined, size: 16, color: AppTheme.textSecondaryColor),
+                  Icon(Icons.category_outlined, size: 16, color: AppTheme.textSecondaryLight),
                   const SizedBox(width: 4),
                   Text(
                     ticket.category ?? 'General',
-                    style: AppTheme.bodySmall,
+                    style: textTheme.bodySmall,
                   ),
                   const Spacer(),
-                  const Icon(Icons.access_time, size: 16, color: AppTheme.textSecondaryColor),
+                  Icon(Icons.access_time, size: 16, color: AppTheme.textSecondaryLight),
                   const SizedBox(width: 4),
                   Text(
                     utils.DateUtils.timeAgo(ticket.createdAt),
-                    style: AppTheme.bodySmall,
+                    style: textTheme.bodySmall,
                   ),
                 ],
               ),

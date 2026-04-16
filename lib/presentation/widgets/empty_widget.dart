@@ -26,19 +26,19 @@ class EmptyWidget extends StatelessWidget {
             Icon(
               icon,
               size: 64,
-              color: AppTheme.textSecondaryColor,
+              color: AppTheme.textSecondaryLight,
             ),
             const SizedBox(height: 16),
             Text(
               title,
-              style: AppTheme.heading3,
+              style: Theme.of(context).textTheme.headlineSmall,
               textAlign: TextAlign.center,
             ),
             if (subtitle != null) ...[
               const SizedBox(height: 8),
               Text(
                 subtitle!,
-                style: AppTheme.bodyMedium,
+                style: Theme.of(context).textTheme.bodyMedium,
                 textAlign: TextAlign.center,
               ),
             ],

@@ -8,6 +8,7 @@ import '../../presentation/screens/tickets/ticket_list_screen.dart';
 import '../../presentation/screens/tickets/ticket_detail_screen.dart';
 import '../../presentation/screens/tickets/create_ticket_screen.dart';
 import '../../presentation/screens/profile_screen.dart';
+import '../../presentation/screens/settings_screen.dart';
 import '../../presentation/screens/notification_screen.dart';
 
 final appRouter = GoRouter(
@@ -25,6 +26,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(path: '/tickets/create', builder: (_, __) => const CreateTicketScreen()),
     GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
+    GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
     GoRoute(path: '/notifications', builder: (_, __) => const NotificationScreen()),
   ],
 );

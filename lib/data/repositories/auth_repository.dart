@@ -1,11 +1,10 @@
 import '../datasources/api_client.dart';
 import '../models/user_model.dart';
 import '../../core/constants/api_constants.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthRepository {
   final _api = ApiClient().dio;
-  final _storage = const FlutterSecureStorage();
 
   Future<Map<String, dynamic>> login(String email, String password) async {
     final res = await _api.post(ApiConstants.login, data: {
@@ -14,9 +13,14 @@ class AuthRepository {
     });
     final token = res.data['token']?.toString() ?? '';
     final user = UserModel.fromJson(res.data['user'] ?? {});
-    await _storage.write(key: 'auth_token', value: token);
-    await _storage.write(key: 'user_role', value: user.role);
-    await _storage.write(key: 'user_id', value: user.id);
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('auth_token', token);
+    await prefs.setString('user_role', user.role);
+    await prefs.setString('user_id', user.id);
+    await prefs.setString('user_name', user.name);
+    await prefs.setString('user_email', user.email);
+
     return {'token': token, 'user': user};
   }
 
@@ -37,10 +41,36 @@ class AuthRepository {
   }
 
   Future<void> logout() async {
-    await _storage.deleteAll();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    await prefs.remove('user_role');
+    await prefs.remove('user_id');
+    await prefs.remove('user_name');
+    await prefs.remove('user_email');
   }
 
-  Future<String?> getToken() => _storage.read(key: 'auth_token');
-  Future<String?> getRole() => _storage.read(key: 'user_role');
-  Future<String?> getUserId() => _storage.read(key: 'user_id');
+  Future<String?> getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('auth_token');
+  }
+
+  Future<String?> getRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_role');
+  }
+
+  Future<String?> getUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_id');
+  }
+
+  Future<String?> getUserName() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_name');
+  }
+
+  Future<String?> getUserEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_email');
+  }
 }

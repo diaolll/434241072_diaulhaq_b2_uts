@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_theme.dart';
 
 class LoadingWidget extends StatelessWidget {
   final String? message;
@@ -17,7 +16,7 @@ class LoadingWidget extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               message!,
-              style: AppTheme.bodyMedium,
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],
         ],
