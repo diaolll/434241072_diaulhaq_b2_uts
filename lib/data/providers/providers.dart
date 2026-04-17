@@ -303,5 +303,51 @@ final themeModeProvider = StateProvider<ThemeMode>((ref) {
   return ThemeMode.system;
 });
 
+// ==================== NOTIFICATION PROVIDER ====================
+final unreadCountProvider = StateProvider<int>((ref) => 0);
+
+final notificationNotifierProvider = StateNotifierProvider<NotificationNotifier, int>((ref) {
+  final repo = ref.read(ticketRepoProvider);
+  return NotificationNotifier(repo);
+});
+
+class NotificationNotifier extends StateNotifier<int> {
+  final TicketRepository _repo;
+
+  NotificationNotifier(this._repo) : super(0) {
+    _loadUnreadCount();
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final notifs = await _repo.getNotifications();
+      final unread = notifs.where((n) => !(n['is_read'] ?? false)).length;
+      print('🔔 Unread count loaded: $unread from ${notifs.length} total notifications');
+      state = unread;
+    } catch (e) {
+      print('❌ Error loading unread count: $e');
+      state = 0;
+    }
+  }
+
+  Future<void> refresh() async {
+    await _loadUnreadCount();
+  }
+
+  Future<void> markAllRead() async {
+    try {
+      final notifs = await _repo.getNotifications();
+      for (final n in notifs) {
+        if (!(n['is_read'] ?? false)) {
+          await _repo.markNotifRead(n['id']);
+        }
+      }
+      state = 0;
+    } catch (e) {
+      // Silently fail
+    }
+  }
+}
+
 // ==================== NAVIGATION PROVIDER ====================
 final selectedTabProvider = StateProvider<int>((ref) => 0);

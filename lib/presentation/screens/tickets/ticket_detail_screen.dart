@@ -23,6 +23,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   bool _loading = true;
   bool _submitting = false;
   String? _userRole;
+  List<Map<String, dynamic>> _helpdeskList = [];
+  bool _loadingHelpdesk = false;
 
   @override
   void initState() {
@@ -61,6 +63,21 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
+
+    // Load helpdesk list jika admin/helpdesk
+    if (_isAdmin) {
+      _loadHelpdeskList();
+    }
+  }
+
+  Future<void> _loadHelpdeskList() async {
+    setState(() => _loadingHelpdesk = true);
+    try {
+      final list = await _repo.getHelpdeskList();
+      if (mounted) setState(() { _helpdeskList = list; _loadingHelpdesk = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loadingHelpdesk = false);
+    }
   }
 
   bool get _isAdmin => _userRole == 'admin' || _userRole == 'helpdesk';
@@ -75,6 +92,28 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _assignTicket(String? helpdeskId) async {
+    if (helpdeskId == null) return;
+    setState(() => _submitting = true);
+    try {
+      await _repo.assignTicket(widget.ticketId, helpdeskId);
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tiket berhasil di-assign'), backgroundColor: AppTheme.statusResolved),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal assign: $e'), backgroundColor: AppTheme.priorityHigh),
+        );
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -236,6 +275,77 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
           // ── Admin Actions ─────────────────────────────────────────────
           if (_isAdmin) ...[
+            const SizedBox(height: 16),
+            // Assign Section
+            Text('Assign Tiket', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
+            const SizedBox(height: 10),
+            _Card(
+              isDark: isDark,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Show current assignee
+                  Row(
+                    children: [
+                      Icon(Icons.person_outline_rounded, size: 16, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Assigned to: ',
+                        style: TextStyle(fontSize: 13, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
+                      ),
+                      Expanded(
+                        child: Text(
+                          t.assignee?.name ?? 'Belum di-assign',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: isDark ? AppTheme.white : AppTheme.black),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Dropdown to assign
+                  if (_loadingHelpdesk)
+                    SizedBox(
+                      height: 40,
+                      child: Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: isDark ? AppTheme.white : AppTheme.black))),
+                    )
+                  else
+                    DropdownButtonFormField<String>(
+                      decoration: InputDecoration(
+                        hintText: 'Pilih Helpdesk',
+                        filled: true,
+                        fillColor: isDark ? AppTheme.dark2 : AppTheme.surface1,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: isDark ? AppTheme.white : AppTheme.black, width: 1),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                      dropdownColor: isDark ? AppTheme.dark1 : AppTheme.surface0,
+                      icon: Icon(Icons.keyboard_arrow_down_rounded, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
+                      style: TextStyle(fontSize: 13, color: isDark ? AppTheme.white : AppTheme.black),
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text('Unassign', style: TextStyle(fontStyle: FontStyle.italic, fontSize: 13))),
+                        ..._helpdeskList.map((h) {
+                          return DropdownMenuItem(
+                            value: h['id'] as String,
+                            child: Text(h['name'] as String, style: const TextStyle(fontSize: 13)),
+                          );
+                        }),
+                      ],
+                      value: t.assignedTo,
+                      onChanged: _submitting ? null : (v) => _assignTicket(v),
+                    ),
+                ],
+              ),
+            ),
             const SizedBox(height: 16),
             Text('Update Status', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
             const SizedBox(height: 10),

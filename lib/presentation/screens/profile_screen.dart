@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/models/user_model.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../../data/providers/providers.dart';
 
 /// Clean Profile Screen - iOS Style
 /// No gradients, minimal design
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _authRepo = AuthRepository();
   UserModel? _user;
   bool _loading = true;
@@ -118,6 +120,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = context.isDark;
+    final unreadCount = ref.watch(notificationNotifierProvider);
 
     if (_loading) {
       return Scaffold(
@@ -320,6 +323,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: 'Notifikasi',
                     isDark: isDark,
                     onTap: () => context.push('/notifications'),
+                    badgeCount: unreadCount,
                   ),
                   const SizedBox(height: 32),
 
@@ -416,12 +420,14 @@ class _MenuAction extends StatelessWidget {
   final String title;
   final bool isDark;
   final VoidCallback onTap;
+  final int? badgeCount;
 
   const _MenuAction({
     required this.icon,
     required this.title,
     required this.isDark,
     required this.onTap,
+    this.badgeCount,
   });
 
   @override
@@ -437,14 +443,40 @@ class _MenuAction extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: isDark ? AppTheme.dark2 : AppTheme.surface1,
-                borderRadius: BorderRadius.circular(9),
-              ),
-              child: Icon(icon, size: 18, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.dark2 : AppTheme.surface1,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Icon(icon, size: 18, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
+                ),
+                if (badgeCount != null && badgeCount! > 0)
+                  Positioned(
+                    right: -4,
+                    top: -4,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        badgeCount! > 9 ? '9+' : badgeCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w700,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 12),
             Expanded(

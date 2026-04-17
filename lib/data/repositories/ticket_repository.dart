@@ -56,7 +56,7 @@ class TicketRepository {
   /// Get ticket by ID - include attachments, comments, and history
   Future<TicketModel> getTicketById(String id) async {
     try {
-      // Fetch ticket dengan comments dan attachments
+      // Fetch ticket dengan comments, attachments (tanpa relationship syntax)
       final response = await _client
           .from('tickets')
           .select('''
@@ -74,6 +74,24 @@ class TicketRepository {
       // Ambil semua user_id dari comments dan history
       final comments = response['comments'] as List? ?? [];
       print('💬 Comments count: ${comments.length}');
+
+      // Fetch assignee data separately
+      final assignedTo = response['assigned_to'] as String?;
+      Map<String, dynamic>? assigneeData;
+      if (assignedTo != null) {
+        try {
+          final assignee = await _client
+              .from('users')
+              .select('id, name, email')
+              .eq('id', assignedTo)
+              .maybeSingle();
+          assigneeData = assignee;
+          print('👤 Assignee: ${assignee?['name']}');
+        } catch (e) {
+          print('⚠️ Failed to fetch assignee: $e');
+        }
+      }
+      response['assignee'] = assigneeData;
 
       // Fetch ticket history
       final history = await _client
@@ -398,6 +416,17 @@ class TicketRepository {
         .limit(50);
 
     return response as List;
+  }
+
+  /// Get list of helpdesk users for assignment
+  Future<List<Map<String, dynamic>>> getHelpdeskList() async {
+    final response = await _client
+        .from('users')
+        .select('id, name, email')
+        .or('role.eq.helpdesk,role.eq.admin')
+        .order('name');
+
+    return (response as List).cast<Map<String, dynamic>>();
   }
 
   /// Mark notification as read

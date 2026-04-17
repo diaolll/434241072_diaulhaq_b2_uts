@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/repositories/ticket_repository.dart';
+import '../../../data/providers/providers.dart';
 
-class NotificationScreen extends StatefulWidget {
+class NotificationScreen extends ConsumerStatefulWidget {
   const NotificationScreen({super.key});
 
   @override
-  State<NotificationScreen> createState() => _NotificationScreenState();
+  ConsumerState<NotificationScreen> createState() => _NotificationScreenState();
 }
 
-class _NotificationScreenState extends State<NotificationScreen> {
+class _NotificationScreenState extends ConsumerState<NotificationScreen> {
   final _repo = TicketRepository();
   List<dynamic> _notifs = [];
   bool _loading = true;
@@ -38,6 +40,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
         final i = _notifs.indexWhere((n) => n['id'] == id);
         if (i >= 0) _notifs[i]['is_read'] = true;
       });
+      // Refresh unread count
+      ref.read(notificationNotifierProvider.notifier).refresh();
       if (ticketId != null && mounted) context.push('/tickets/$ticketId');
     } catch (_) {}
   }
@@ -47,6 +51,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
       if (!(n['is_read'] ?? false)) await _repo.markNotifRead(n['id']);
     }
     await _load();
+    // Refresh unread count
+    ref.read(notificationNotifierProvider.notifier).refresh();
   }
 
   String _fmt(String? raw) {

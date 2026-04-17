@@ -21,6 +21,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void initState() {
     super.initState();
     _loadUserRole();
+    // Refresh unread count when dashboard loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(notificationNotifierProvider.notifier).refresh();
+    });
   }
 
   Future<void> _loadUserRole() async {
@@ -34,6 +38,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final isDark = context.isDark;
     final ticketsState = ref.watch(ticketsProvider);
     final stats = ticketsState.stats;
+    final unreadCount = ref.watch(notificationNotifierProvider);
+
+    // Debug: print unread count
+    print('🔔 Dashboard build - unreadCount: $unreadCount');
 
     // Hanya user biasa yang bisa buat tiket
     final canCreateTicket = _userRole == 'user';
@@ -43,7 +51,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
-          onRefresh: () => ref.read(ticketsProvider.notifier).refresh(),
+          onRefresh: () async {
+            await ref.read(ticketsProvider.notifier).refresh();
+            await ref.read(notificationNotifierProvider.notifier).refresh();
+          },
           color: isDark ? AppTheme.white : AppTheme.black,
           child: CustomScrollView(
             slivers: [
@@ -86,10 +97,38 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
                           ),
-                          child: Icon(
-                            Icons.notifications_outlined,
-                            size: 20,
-                            color: isDark ? AppTheme.white : AppTheme.black,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Center(
+                                child: Icon(
+                                  Icons.notifications_outlined,
+                                  size: 20,
+                                  color: isDark ? AppTheme.white : AppTheme.black,
+                                ),
+                              ),
+                              if (unreadCount > 0)
+                                Positioned(
+                                  right: -2,
+                                  top: -2,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Text(
+                                      unreadCount > 9 ? '9+' : unreadCount.toString(),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w700,
+                                        height: 1,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       ),
@@ -194,6 +233,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         isDark: isDark,
         canCreateTicket: canCreateTicket,
         onFab: () => context.push('/tickets/create'),
+        unreadCount: unreadCount,
       ),
     );
   }
@@ -619,17 +659,18 @@ class _BottomBar extends StatelessWidget {
   final VoidCallback onFab;
   final bool isDark;
   final bool canCreateTicket;
-  const _BottomBar({required this.current, required this.onChanged, required this.onFab, required this.isDark, required this.canCreateTicket});
+  final int unreadCount;
+  const _BottomBar({required this.current, required this.onChanged, required this.onFab, required this.isDark, required this.canCreateTicket, required this.unreadCount});
 
   @override
   Widget build(BuildContext context) {
     // Layout berbeda berdasarkan role
     if (canCreateTicket) {
       // User biasa: 4 nav items + FAB di tengah
-      return _UserBottomNav(current: current, onChanged: onChanged, onFab: onFab, isDark: isDark);
+      return _UserBottomNav(current: current, onChanged: onChanged, onFab: onFab, isDark: isDark, unreadCount: unreadCount);
     } else {
       // Admin/Helpdesk: 4 nav items evenly distributed
-      return _AdminBottomNav(current: current, onChanged: onChanged, isDark: isDark);
+      return _AdminBottomNav(current: current, onChanged: onChanged, isDark: isDark, unreadCount: unreadCount);
     }
   }
 }
@@ -640,7 +681,8 @@ class _UserBottomNav extends StatelessWidget {
   final ValueChanged<int> onChanged;
   final VoidCallback onFab;
   final bool isDark;
-  const _UserBottomNav({required this.current, required this.onChanged, required this.onFab, required this.isDark});
+  final int unreadCount;
+  const _UserBottomNav({required this.current, required this.onChanged, required this.onFab, required this.isDark, required this.unreadCount});
 
   @override
   Widget build(BuildContext context) {
@@ -671,7 +713,7 @@ class _UserBottomNav extends StatelessWidget {
                   child: Icon(Icons.add_rounded, size: 22, color: isDark ? AppTheme.black : AppTheme.white),
                 ),
               ),
-              _NavItem(icon: Icons.notifications_outlined, label: 'Notifikasi', active: current == 2, onTap: () => onChanged(2), isDark: isDark),
+              _NavItem(icon: Icons.notifications_outlined, label: 'Notifikasi', active: current == 2, onTap: () => onChanged(2), isDark: isDark, badgeCount: unreadCount),
               _NavItem(icon: Icons.person_outline_rounded, label: 'Profil', active: current == 3, onTap: () => onChanged(3), isDark: isDark),
             ],
           ),
@@ -686,7 +728,8 @@ class _AdminBottomNav extends StatelessWidget {
   final int current;
   final ValueChanged<int> onChanged;
   final bool isDark;
-  const _AdminBottomNav({required this.current, required this.onChanged, required this.isDark});
+  final int unreadCount;
+  const _AdminBottomNav({required this.current, required this.onChanged, required this.isDark, required this.unreadCount});
 
   @override
   Widget build(BuildContext context) {
@@ -704,7 +747,7 @@ class _AdminBottomNav extends StatelessWidget {
             children: [
               _NavItem(icon: Icons.grid_view_rounded, label: 'Dashboard', active: current == 0, onTap: () => onChanged(0), isDark: isDark),
               _NavItem(icon: Icons.list_alt_rounded, label: 'Tiket', active: current == 1, onTap: () => onChanged(1), isDark: isDark),
-              _NavItem(icon: Icons.notifications_outlined, label: 'Notifikasi', active: current == 2, onTap: () => onChanged(2), isDark: isDark),
+              _NavItem(icon: Icons.notifications_outlined, label: 'Notifikasi', active: current == 2, onTap: () => onChanged(2), isDark: isDark, badgeCount: unreadCount),
               _NavItem(icon: Icons.person_outline_rounded, label: 'Profil', active: current == 3, onTap: () => onChanged(3), isDark: isDark),
             ],
           ),
@@ -720,7 +763,8 @@ class _NavItem extends StatelessWidget {
   final bool active;
   final VoidCallback onTap;
   final bool isDark;
-  const _NavItem({required this.icon, required this.label, required this.active, required this.onTap, required this.isDark});
+  final int? badgeCount;
+  const _NavItem({required this.icon, required this.label, required this.active, required this.onTap, required this.isDark, this.badgeCount});
 
   @override
   Widget build(BuildContext context) {
@@ -736,7 +780,33 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 22, color: color),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(icon, size: 22, color: color),
+                if (badgeCount != null && badgeCount! > 0)
+                  Positioned(
+                    right: -8,
+                    top: -4,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        badgeCount! > 9 ? '9+' : badgeCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 7,
+                          fontWeight: FontWeight.w700,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 2),
             Text(
               label,
