@@ -6,14 +6,26 @@
 ┌─────────────────────────────────────────────────────────────────┐
 │                        FLUTTER APP                              │
 │                    (Mobile SMT4 - UI)                           │
-└──────────────────────────────┬──────────────────────────────────┘
-                               │
-                    ┌──────────┴──────────┐
-                    │                     │
-            AUTH (Supabase Auth)   DATA (Supabase DB)
-                    │                     │
-                    └──────────┬──────────┘
-                               │
+│                                                                  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                    PRESENTATION LAYER                     │  │
+│  │  Screens → Widgets → (Consumer widgets via Riverpod)      │  │
+│  └────────────────────────┬──────────────────────────────────┘  │
+│                           │                                       │
+│  ┌────────────────────────┴──────────────────────────────────┐  │
+│  │                   STATE MANAGEMENT (Riverpod)             │  │
+│  │  - Providers (authNotifierProvider, ticketsProvider, etc) │  │
+│  │  - StateNotifiers (AuthNotifier, TicketsNotifier)         │  │
+│  │  - StateProviders (authStateProvider, themeModeProvider)  │  │
+│  └────────────────────────┬──────────────────────────────────┘  │
+└───────────────────────────┼──────────────────────────────────────┘
+                            │
+                    ┌───────┴────────┐
+                    │                │
+            AUTH (Supabase Auth)  DATA (Supabase DB)
+                    │                │
+                    └────────┬───────┘
+                             │
                     ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                       SUPABASE (All-in-One)                     │
@@ -27,6 +39,59 @@
 │  │                  │  │ - notifications  │  │               │ │
 │  └──────────────────┘  └──────────────────┘  └───────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
+```
+
+## State Management: Riverpod
+
+**Library**: `flutter_riverpod` ^2.4.9
+
+### Provider Types Used
+
+| Type | Provider | Usage |
+|------|----------|-------|
+| **StateNotifierProvider** | `authNotifierProvider` | Auth state management (login, logout, register) |
+| **StateNotifierProvider** | `ticketsProvider` | Ticket CRUD operations & filtering |
+| **StateNotifierProvider** | `notificationNotifierProvider` | Unread notification count |
+| **StateProvider** | `authStateProvider` | Simple auth boolean state |
+| **StateProvider** | `searchQueryProvider` | Search query string |
+| **StateProvider** | `themeModeProvider` | Light/dark theme mode |
+| **StateProvider** | `selectedTabProvider` | Bottom navigation index |
+| **StateProvider** | `unreadCountProvider` | Unread notification counter |
+| **FutureProvider** | `currentUserProvider` | Async current user data |
+| **Provider** | `ticketRepoProvider`, `authRepoProvider` | Repository instances |
+| **Provider.family** | `filteredTicketsProvider` | Filter tickets by status |
+
+### Key State Classes
+
+```dart
+// Auth State
+class AuthState {
+  final bool isAuthenticated;
+  final UserModel? user;
+  final bool isLoading;
+  final String? error;
+}
+
+// Tickets State
+class TicketsState {
+  final List<TicketModel> tickets;
+  final Map<String, int> stats;
+  final bool isLoading;
+  final bool isSubmitting;
+  final String? error;
+}
+```
+
+### Usage Example
+
+```dart
+// Watch state in widget
+final authState = ref.watch(authNotifierProvider);
+final tickets = ref.watch(ticketListProvider);
+
+// Call actions
+ref.read(authNotifierProvider.notifier).login(email, password);
+ref.read(ticketsProvider.notifier).refresh();
 ```
 
 ---
@@ -157,6 +222,101 @@ RLS memastikan user hanya bisa akses data yang berhak:
 | `notifications` | View own notifications | `user_id = auth.uid()` |
 
 ---
+
+## Struktur Project (Clean Architecture)
+
+```
+lib/
+├── core/                    # Shared utilities & configs
+│   ├── config/
+│   │   └── env_config.dart         # Environment variables
+│   ├── constants/
+│   │   ├── app_constants.dart      # App-wide constants
+│   │   └── api_constants.dart      # API endpoints
+│   ├── services/
+│   │   ├── supabase_service.dart   # Supabase client
+│   │   └── theme_service.dart      # Theme management
+│   ├── theme/
+│   │   ├── app_theme.dart          # Light/dark themes
+│   │   ├── modern_theme.dart       # Modern theme variant
+│   │   └── elegant_theme.dart      # Elegant theme variant
+│   └── utils/
+│       ├── validators.dart         # Input validators
+│       └── date_utils.dart         # Date formatting
+│
+├── data/                    # Data layer (repositories, models, datasources)
+│   ├── datasources/
+│   │   └── api_client.dart         # HTTP client wrapper
+│   ├── models/
+│   │   ├── user_model.dart         # User data model
+│   │   ├── ticket_model.dart       # Ticket data model
+│   │   ├── comment_model.dart      # Comment data model
+│   │   └── auth_response_model.dart
+│   ├── repositories/
+│   │   ├── auth_repository.dart    # Auth data operations
+│   │   └── ticket_repository.dart  # Ticket data operations
+│   └── providers/
+│       └── providers.dart          # Riverpod providers (all state)
+│
+├── domain/                  # Domain layer (entities, usecases)
+│   ├── entities/
+│   │   ├── user_entity.dart        # User domain entity
+│   │   ├── ticket_entity.dart      # Ticket domain entity
+│   │   └── comment_entity.dart     # Comment domain entity
+│   └── usecases/
+│       ├── login_usecase.dart      # Login business logic
+│       ├── logout_usecase.dart     # Logout business logic
+│       ├── get_tickets_usecase.dart
+│       └── create_ticket_usecase.dart
+│
+├── presentation/            # UI layer
+│   ├── screens/
+│   │   ├── splash_screen.dart      # Launch screen
+│   │   ├── login_screen.dart       # Login page
+│   │   ├── login_elegant.dart      # Elegant login variant
+│   │   ├── register_screen.dart    # Registration
+│   │   ├── reset_password_screen.dart
+│   │   ├── dashboard/
+│   │   │   └── dashboard_screen.dart      # Main dashboard
+│   │   ├── tickets/
+│   │   │   ├── ticket_list_screen.dart    # Ticket list
+│   │   │   ├── ticket_detail_screen.dart  # Ticket details
+│   │   │   └── create_ticket_screen.dart  # Create ticket
+│   │   ├── notification_screen.dart
+│   │   ├── profile_screen.dart
+│   │   └── settings_screen.dart
+│   ├── widgets/
+│   │   ├── common/                 # Reusable widgets
+│   │   │   ├── app_button.dart
+│   │   │   ├── app_input.dart
+│   │   │   ├── app_card.dart
+│   │   │   ├── status_badge.dart
+│   │   │   ├── empty_state.dart
+│   │   │   └── loading_shimmer.dart
+│   │   └── elegant/                # Elegant theme widgets
+│   │       └── elegant_widgets.dart
+│   └── router/
+│       └── app_router.dart         # GoRouter configuration
+│
+└── main.dart                # App entry point (ProviderScope wrapper)
+```
+
+## Navigation: Go Router
+
+**Library**: `go_router` ^12.1.1
+
+| Route | Screen |
+|-------|--------|
+| `/` | Splash → redirect based on auth |
+| `/login` | Login Screen |
+| `/register` | Register Screen |
+| `/dashboard` | Main Dashboard |
+| `/tickets` | Ticket List |
+| `/tickets/:id` | Ticket Detail |
+| `/tickets/create` | Create Ticket |
+| `/notifications` | Notifications |
+| `/profile` | Profile |
+| `/settings` | Settings |
 
 ## Konfigurasi
 
