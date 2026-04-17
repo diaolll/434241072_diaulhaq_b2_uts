@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../data/providers/providers.dart';
 
@@ -14,12 +15,28 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   int _tab = 0;
+  String? _userRole;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserRole();
+  }
+
+  Future<void> _loadUserRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    final role = prefs.getString('user_role') ?? 'user';
+    if (mounted) setState(() => _userRole = role);
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = context.isDark;
     final ticketsState = ref.watch(ticketsProvider);
     final stats = ticketsState.stats;
+
+    // Hanya user biasa yang bisa buat tiket
+    final canCreateTicket = _userRole == 'user';
 
     return Scaffold(
       backgroundColor: isDark ? AppTheme.dark0 : AppTheme.surface1,
@@ -175,6 +192,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           }
         },
         isDark: isDark,
+        canCreateTicket: canCreateTicket,
         onFab: () => context.push('/tickets/create'),
       ),
     );
@@ -600,7 +618,29 @@ class _BottomBar extends StatelessWidget {
   final ValueChanged<int> onChanged;
   final VoidCallback onFab;
   final bool isDark;
-  const _BottomBar({required this.current, required this.onChanged, required this.onFab, required this.isDark});
+  final bool canCreateTicket;
+  const _BottomBar({required this.current, required this.onChanged, required this.onFab, required this.isDark, required this.canCreateTicket});
+
+  @override
+  Widget build(BuildContext context) {
+    // Layout berbeda berdasarkan role
+    if (canCreateTicket) {
+      // User biasa: 4 nav items + FAB di tengah
+      return _UserBottomNav(current: current, onChanged: onChanged, onFab: onFab, isDark: isDark);
+    } else {
+      // Admin/Helpdesk: 4 nav items evenly distributed
+      return _AdminBottomNav(current: current, onChanged: onChanged, isDark: isDark);
+    }
+  }
+}
+
+// Navbar untuk user biasa (dengan FAB create tiket)
+class _UserBottomNav extends StatelessWidget {
+  final int current;
+  final ValueChanged<int> onChanged;
+  final VoidCallback onFab;
+  final bool isDark;
+  const _UserBottomNav({required this.current, required this.onChanged, required this.onFab, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
@@ -631,6 +671,39 @@ class _BottomBar extends StatelessWidget {
                   child: Icon(Icons.add_rounded, size: 22, color: isDark ? AppTheme.black : AppTheme.white),
                 ),
               ),
+              _NavItem(icon: Icons.notifications_outlined, label: 'Notifikasi', active: current == 2, onTap: () => onChanged(2), isDark: isDark),
+              _NavItem(icon: Icons.person_outline_rounded, label: 'Profil', active: current == 3, onTap: () => onChanged(3), isDark: isDark),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Navbar untuk admin/helpdesk (tanpa FAB, evenly distributed)
+class _AdminBottomNav extends StatelessWidget {
+  final int current;
+  final ValueChanged<int> onChanged;
+  final bool isDark;
+  const _AdminBottomNav({required this.current, required this.onChanged, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.dark1 : AppTheme.surface0,
+        border: Border(top: BorderSide(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 60,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _NavItem(icon: Icons.grid_view_rounded, label: 'Dashboard', active: current == 0, onTap: () => onChanged(0), isDark: isDark),
+              _NavItem(icon: Icons.list_alt_rounded, label: 'Tiket', active: current == 1, onTap: () => onChanged(1), isDark: isDark),
               _NavItem(icon: Icons.notifications_outlined, label: 'Notifikasi', active: current == 2, onTap: () => onChanged(2), isDark: isDark),
               _NavItem(icon: Icons.person_outline_rounded, label: 'Profil', active: current == 3, onTap: () => onChanged(3), isDark: isDark),
             ],

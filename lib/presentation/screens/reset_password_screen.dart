@@ -27,7 +27,10 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
     if (!_form.currentState!.validate()) return;
     setState(() => _loading = true);
     try {
-      await SupabaseService.client.auth.resetPasswordForEmail(_email.text.trim());
+      await SupabaseService.client.auth.resetPasswordForEmail(
+        _email.text.trim(),
+        redirectTo: 'kissanime.co.id://reset-password/',
+      );
       if (mounted) setState(() { _sent = true; _loading = false; });
     } catch (e) {
       if (mounted) {

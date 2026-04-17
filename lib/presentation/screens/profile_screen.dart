@@ -166,6 +166,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             pinned: true,
             elevation: 0,
             backgroundColor: Colors.transparent,
+            leading: IconButton(
+              icon: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 18,
+                color: isDark ? AppTheme.black : AppTheme.white,
+              ),
+              onPressed: () => context.pop(),
+            ),
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 color: isDark ? AppTheme.white : AppTheme.black,

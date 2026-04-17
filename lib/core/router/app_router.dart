@@ -23,6 +23,17 @@ final appRouter = GoRouter(
     final publicRoutes = ['/', '/login', '/register', '/reset-password'];
     if (!isAuth && !publicRoutes.contains(loc)) return '/login';
     if (isAuth && (loc == '/login' || loc == '/register')) return '/dashboard';
+
+    // Role-based access control
+    if (isAuth) {
+      final role = prefs.getString('user_role') ?? 'user';
+
+      // Hanya role 'user' yang bisa buat tiket
+      if (loc == '/tickets/create' && role != 'user') {
+        return '/tickets';
+      }
+    }
+
     return null;
   },
   routes: [

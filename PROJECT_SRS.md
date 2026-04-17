@@ -8,34 +8,38 @@ Aplikasi mobile E-Ticketing Helpdesk berbasis Flutter untuk pelaporan, monitorin
 - [x] Username/password login
 - [x] Supabase Authentication
 - [x] Session management
+- [x] All user roles (user, helpdesk, admin)
 
 ### ✅ FR-002: Logout
 - [x] Logout functionality
 - [x] Clear session
+- [x] All user roles
 
 ### ✅ FR-003: Register
-- [x] User registration
-- [x] Email verification
+- [x] User registration (role: user only)
+- [x] Auto-assign role 'user'
 - [x] Name, email, password fields
 
 ### ✅ FR-004: Reset Password
 - [x] Reset password screen
 - [x] Email-based reset flow
+- [x] All user roles
 
 ### ✅ FR-005: User - Manajemen Tiket
 - [x] Create ticket with category & priority
 - [x] Upload attachment (camera/gallery/file)
-- [x] View ticket list
+- [x] View own ticket list only
 - [x] View ticket details
 - [x] Add comments/replies
 - [x] Track ticket status
 
 ### ✅ FR-006: Admin/Helpdesk - Manajemen Tiket
-- [x] View all tickets
+- [x] View ALL tickets (not just own)
 - [x] Filter by status, priority, category
-- [x] Update ticket status
-- [x] Assign ticket to helpdesk
+- [x] Update ticket status (admin/helpdesk only)
+- [x] Assign ticket to helpdesk (backend ready)
 - [x] Add comments
+- [x] Cannot create tickets (user only)
 
 ### ✅ FR-007: Notifikasi
 - [x] Notification screen
@@ -45,23 +49,27 @@ Aplikasi mobile E-Ticketing Helpdesk berbasis Flutter untuk pelaporan, monitorin
 ### ✅ FR-008: Dashboard
 - [x] Total tickets
 - [x] Status distribution
-- [x] Quick actions
+- [x] Role-based stats (user: own, admin/helpdesk: all)
 - [x] Chart visualization
+- [x] Quick actions
 
 ### ✅ FR-010: Riwayat Tiket
-- [x] Timeline view
+- [x] Timeline view with status badges
 - [x] Status change history
 - [x] Notes & timestamps
+- [x] User who made changes displayed
 
 ### ✅ FR-011: Tracking Tiket
 - [x] Real-time status updates
 - [x] Progress visualization
+- [x] Status badges on all screens
 
 ### ✅ Non-Functional Requirements
 - [x] Lazy loading for lists
 - [x] Responsive UI (Material 3)
 - [x] Dark & Light mode
 - [x] Clean Architecture
+- [x] Role-Based Access Control (RBAC)
 
 ## 🛠️ Tech Stack
 

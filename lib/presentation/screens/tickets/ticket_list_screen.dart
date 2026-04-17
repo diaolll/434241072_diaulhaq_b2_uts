@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/ticket_model.dart';
 import '../../../data/providers/providers.dart';
@@ -17,6 +18,22 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
   String? _filterStatus;
   String? _filterPriority;
   bool _showFilter = false;
+  String? _userRole;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserRole();
+  }
+
+  Future<void> _loadUserRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    final role = prefs.getString('user_role') ?? 'user';
+    if (mounted) setState(() => _userRole = role);
+  }
+
+  // Hanya user biasa yang bisa buat tiket
+  bool get canCreateTicket => _userRole == 'user';
 
   @override
   void dispose() {
@@ -124,15 +141,18 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/tickets/create'),
-        backgroundColor: isDark ? AppTheme.white : AppTheme.black,
-        foregroundColor: isDark ? AppTheme.black : AppTheme.white,
-        elevation: 0,
-        icon: const Icon(Icons.add_rounded, size: 20),
-        label: const Text('Buat Tiket', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      ),
+      // FAB hanya untuk role user
+      floatingActionButton: canCreateTicket
+          ? FloatingActionButton.extended(
+              onPressed: () => context.push('/tickets/create'),
+              backgroundColor: isDark ? AppTheme.white : AppTheme.black,
+              foregroundColor: isDark ? AppTheme.black : AppTheme.white,
+              elevation: 0,
+              icon: const Icon(Icons.add_rounded, size: 20),
+              label: const Text('Buat Tiket', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            )
+          : null,
     );
   }
 

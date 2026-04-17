@@ -170,18 +170,31 @@ class AuthRepository {
   }
 
   /// Pastikan user ada di tabel users (pakai upsert)
+  /// Jangan override role yang sudah ada di database
   Future<void> _ensureUserExists(User user) async {
     final metadata = user.userMetadata ?? {};
 
+    // Cek dulu apakah user sudah ada
+    final existing = await _client
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+    final role = existing?['role'] ??
+                 metadata['role'] ??
+                 'user';
+
     // Upsert - insert atau update jika sudah ada
+    // Tapi jangan override role jika sudah ada
     await _client.from('users').upsert({
       'id': user.id,
       'email': user.email,
       'name': metadata['name'] ?? user.email?.split('@')[0],
-      'role': metadata['role'] ?? 'user',
+      'role': role,  // Pakai role dari database jika ada
     }, onConflict: 'id');
 
-    print('✅ Upsert user: ${user.id}');
+    print('✅ Upsert user: ${user.id} with role: $role');
   }
 
   /// Refresh session

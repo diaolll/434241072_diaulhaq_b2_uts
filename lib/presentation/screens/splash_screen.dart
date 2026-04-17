@@ -35,8 +35,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   Future<void> _navigate() async {
     await Future.delayed(const Duration(milliseconds: 2200));
     if (!mounted) return;
+
     final auth = ref.read(authNotifierProvider);
-    context.go(auth.isAuthenticated ? '/dashboard' : '/login');
+
+    if (mounted) {
+      context.go(auth.isAuthenticated ? '/dashboard' : '/login');
+    }
   }
 
   @override

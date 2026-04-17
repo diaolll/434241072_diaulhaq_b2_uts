@@ -39,16 +39,23 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   Future<void> _load() async {
     try {
       final t = await _repo.getTicketById(widget.ticketId);
-      String? role = SupabaseService.currentUser?.userMetadata?['role'];
-      if (role == null) {
-        final prefs = await SharedPreferences.getInstance();
-        role = prefs.getString('user_role');
+
+      // Ambil role dari SharedPreferences (prioritas, karena sync dari tabel users)
+      final prefs = await SharedPreferences.getInstance();
+      String? role = prefs.getString('user_role');
+
+      // Fallback ke auth metadata jika SharedPreferences kosong
+      if (role == null || role.isEmpty) {
+        role = SupabaseService.currentUser?.userMetadata?['role'];
       }
 
-      // Debug: print comments count
+      // Default ke 'user' jika masih kosong
+      role ??= 'user';
+
+      // Debug: print role
       print('📋 Ticket loaded: ${t.title}');
-      print('💬 Comments count: ${t.comments.length}');
-      print('📎 Attachments count: ${t.attachments.length}');
+      print('👤 User role: $role');
+      print('🔧 Is admin/helpdesk: ${role == 'admin' || role == 'helpdesk'}');
 
       if (mounted) setState(() { _ticket = t; _userRole = role; _loading = false; });
     } catch (_) {
@@ -274,6 +281,17 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             )),
           ],
 
+          // ── History / Riwayat ──────────────────────────────────────────
+          if (t.history.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            Text('Riwayat', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
+            const SizedBox(height: 10),
+            ...t.history.map((h) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _HistoryCard(history: h, isDark: isDark),
+            )),
+          ],
+
           // ── Comments ──────────────────────────────────────────────────
           const SizedBox(height: 20),
           Row(
@@ -302,35 +320,36 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           _Card(
             isDark: isDark,
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: TextField(
                     controller: _commentCtrl,
                     maxLines: 4,
                     minLines: 1,
-                    style: TextStyle(fontSize: 14, color: isDark ? AppTheme.white : AppTheme.black),
+                    style: TextStyle(fontSize: 14, color: isDark ? AppTheme.white : AppTheme.black, height: 1.5),
                     decoration: InputDecoration(
                       hintText: 'Tulis komentar...',
                       hintStyle: TextStyle(fontSize: 14, color: isDark ? AppTheme.textTertiaryDark : AppTheme.textTertiary),
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                      isDense: true,
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 GestureDetector(
                   onTap: _submitting ? null : _addComment,
                   child: Container(
-                    width: 36,
-                    height: 36,
+                    width: 38,
+                    height: 38,
                     decoration: BoxDecoration(
                       color: isDark ? AppTheme.white : AppTheme.black,
-                      borderRadius: BorderRadius.circular(9),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: _submitting
                         ? Padding(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(9),
                             child: CircularProgressIndicator(strokeWidth: 2, color: isDark ? AppTheme.black : AppTheme.white),
                           )
                         : Icon(Icons.send_rounded, size: 18, color: isDark ? AppTheme.black : AppTheme.white),
@@ -557,5 +576,123 @@ class _AttachmentCard extends StatelessWidget {
         color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary,
       ),
     );
+  }
+}
+
+class _HistoryCard extends StatelessWidget {
+  final dynamic history;
+  final bool isDark;
+
+  const _HistoryCard({required this.history, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    // Handle both Map and HistoryModel
+    final oldStatus = history is Map
+        ? (history as Map)['old_status'] as String? ?? ''
+        : history.oldStatus ?? '';
+    final newStatus = history is Map
+        ? (history as Map)['new_status'] as String? ?? ''
+        : history.newStatus ?? '';
+    final note = history is Map
+        ? (history as Map)['note'] as String? ?? ''
+        : history.note ?? '';
+    final user = history is Map
+        ? (history as Map)['user']
+        : history.user;
+    final userName = user is Map
+        ? (user as Map)['name'] as String? ?? 'Unknown'
+        : (user as dynamic)?.name ?? 'Unknown';
+    final createdAt = history is Map
+        ? (history as Map)['created_at'] != null
+            ? DateTime.parse((history as Map)['created_at'])
+            : DateTime.now()
+        : history.createdAt ?? DateTime.now();
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.dark1 : AppTheme.surface0,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: AppTheme.statusBgColor(newStatus, isDark: isDark),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Center(
+              child: Icon(
+                _getStatusIcon(newStatus),
+                size: 12,
+                color: AppTheme.statusColor(newStatus),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      userName,
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? AppTheme.white : AppTheme.black),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _formatDate(createdAt),
+                      style: TextStyle(fontSize: 10, color: isDark ? AppTheme.textTertiaryDark : AppTheme.textTertiary),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                if (oldStatus.isNotEmpty)
+                  Text(
+                    'Status: ${AppTheme.statusLabel(oldStatus)} → ${AppTheme.statusLabel(newStatus)}',
+                    style: TextStyle(fontSize: 11, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
+                  )
+                else
+                  Text(
+                    'Status: ${AppTheme.statusLabel(newStatus)}',
+                    style: TextStyle(fontSize: 11, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
+                  ),
+                if (note.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    note,
+                    style: TextStyle(fontSize: 11, color: isDark ? AppTheme.textTertiaryDark : AppTheme.textTertiary, fontStyle: FontStyle.italic),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status) {
+      case 'resolved': return Icons.check_rounded;
+      case 'in_progress': return Icons.pending_rounded;
+      case 'closed': return Icons.lock_outline_rounded;
+      default: return Icons.inbox_rounded;
+    }
+  }
+
+  String _formatDate(DateTime d) {
+    final now = DateTime.now();
+    final diff = now.difference(d);
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m lalu';
+    if (diff.inHours < 24) return '${diff.inHours}j lalu';
+    if (diff.inDays < 7) return '${diff.inDays}h lalu';
+    return '${d.day}/${d.month}/${d.year}';
   }
 }

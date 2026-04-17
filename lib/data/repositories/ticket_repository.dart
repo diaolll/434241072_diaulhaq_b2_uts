@@ -1,6 +1,7 @@
 import '../models/ticket_model.dart';
 import '../../core/services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class TicketRepository {
   final _client = SupabaseService.client;
@@ -8,42 +9,54 @@ class TicketRepository {
   /// Get current user ID from Supabase Auth (RLS friendly)
   String? get _currentUserId => _client.auth.currentUser?.id;
 
-  /// Get current user role from Supabase Auth metadata
-  String get _currentRole {
-    final metadata = _client.auth.currentUser?.userMetadata ?? {};
-    return metadata['role']?.toString() ?? 'user';
+  /// Get current user role from SharedPreferences (synced from users table)
+  Future<String> get _currentRole async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_role') ?? 'user';
   }
 
   /// Check if current user is admin/helpdesk
-  bool get _isAdmin => _currentRole == 'admin' || _currentRole == 'helpdesk';
+  Future<bool> get _isAdmin async {
+    final role = await _currentRole;
+    return role == 'admin' || role == 'helpdesk';
+  }
 
   /// Get all tickets - admin/helpdesk see all, users see own
   Future<List<TicketModel>> getTickets() async {
     final userId = _currentUserId;
     if (userId == null) throw Exception('User not authenticated');
 
-    final isAdmin = _isAdmin;
+    final role = await _currentRole;
+    final isAdmin = await _isAdmin;
 
-    // Admin/Helpdesk lihat semua ticket, user biasa cuma milik sendiri
-    final response = await _client
-        .from('tickets')
-        .select()
-        .order('created_at', ascending: false);
+    print('🎫 GetTickets: userId=$userId, role=$role, isAdmin=$isAdmin');
 
-    // TODO: Filter manually if not admin
-    // Sementara tampilkan semua tiket ( karena user_id lama beda dengan Supabase Auth)
-    // final List filtered = isAdmin
-    //     ? response as List
-    //     : (response as List).where((t) => t['user_id'] == userId).toList();
+    try {
+      // Admin/Helpdesk lihat semua tiket, user biasa hanya milik sendiri
+      final response = await _client
+          .from('tickets')
+          .select()
+          .order('created_at', ascending: false);
 
-    final List filtered = response as List;
+      print('🎫 Raw response count: ${response.length}');
 
-    return filtered.map((e) => TicketModel.fromJson(e)).toList();
+      final List filtered = isAdmin
+          ? response as List
+          : (response as List).where((t) => t['user_id'] == userId).toList();
+
+      print('🎫 Filtered count: ${filtered.length}');
+
+      return filtered.map((e) => TicketModel.fromJson(e)).toList();
+    } catch (e) {
+      print('❌ GetTickets error: $e');
+      rethrow;
+    }
   }
 
-  /// Get ticket by ID - include attachments & comments
+  /// Get ticket by ID - include attachments, comments, and history
   Future<TicketModel> getTicketById(String id) async {
     try {
+      // Fetch ticket dengan comments dan attachments
       final response = await _client
           .from('tickets')
           .select('''
@@ -58,13 +71,75 @@ class TicketRepository {
         throw Exception('Ticket not found: $id');
       }
 
+      // Ambil semua user_id dari comments dan history
+      final comments = response['comments'] as List? ?? [];
+      print('💬 Comments count: ${comments.length}');
+
+      // Fetch ticket history
+      final history = await _client
+          .from('ticket_history')
+          .select('*')
+          .eq('ticket_id', id)
+          .order('created_at', ascending: false);
+
+      print('📜 History count: ${history.length}');
+      response['history'] = history;
+
+      final userIds = comments
+          .map((c) => c['user_id'] as String?)
+          .where((id) => id != null)
+          .toSet()
+          .cast<String>()
+          .toList();
+
+      // Tambahkan user_id dari history
+      for (var h in history) {
+        final changerId = h['changed_by'] as String?;
+        if (changerId != null) userIds.add(changerId);
+      }
+
+      print('👤 User IDs from comments & history: $userIds');
+
+      // Fetch data user untuk setiap user_id
+      Map<String, Map<String, dynamic>> usersData = {};
+      if (userIds.isNotEmpty) {
+        final users = await _client
+            .from('users')
+            .select('id, name, email')
+            .inFilter('id', userIds);
+
+        print('📦 Users data fetched: ${users.length} users');
+
+        for (var user in users) {
+          usersData[user['id']] = user;
+          print('   - ${user['id']}: ${user['name']}');
+        }
+      }
+
+      // Inject data user ke dalam comments
+      for (var comment in comments) {
+        final userId = comment['user_id'] as String?;
+        if (userId != null && usersData.containsKey(userId)) {
+          comment['user'] = usersData[userId];
+        }
+      }
+
+      // Inject data user ke dalam history
+      for (var h in history) {
+        final changerId = h['changed_by'] as String?;
+        if (changerId != null && usersData.containsKey(changerId)) {
+          h['user'] = usersData[changerId];
+        }
+      }
+
       return TicketModel.fromJson(response);
     } catch (e) {
+      print('❌ Error loading ticket: $e');
       throw Exception('Failed to load ticket: $e');
     }
   }
 
-  /// Create new ticket
+  /// Create new ticket - hanya role 'user' yang bisa membuat tiket
   Future<TicketModel> createTicket({
     required String title,
     required String description,
@@ -75,6 +150,13 @@ class TicketRepository {
     if (userId == null) {
       print('❌ User not authenticated');
       throw Exception('User not authenticated. Please login first.');
+    }
+
+    // Cek role - hanya user biasa yang bisa buat tiket
+    final role = await _currentRole;
+    if (role != 'user') {
+      print('❌ Only regular users can create tickets. Current role: $role');
+      throw Exception('Hanya user biasa yang dapat membuat tiket. Admin dan Helpdesk tidak perlu membuat tiket.');
     }
 
     print('📝 Creating ticket: userId=$userId, title=$title');
@@ -170,6 +252,20 @@ class TicketRepository {
     );
   }
 
+  /// Get ticket history
+  Future<List<Map<String, dynamic>>> getTicketHistory(String ticketId) async {
+    final response = await _client
+        .from('ticket_history')
+        .select('''
+          *,
+          users(name)
+        ''')
+        .eq('ticket_id', ticketId)
+        .order('created_at', ascending: false);
+
+    return (response as List).cast<Map<String, dynamic>>();
+  }
+
   /// Add comment to ticket
   Future<void> addComment(String ticketId, String content) async {
     final userId = _currentUserId;
@@ -262,15 +358,16 @@ class TicketRepository {
     final userId = _currentUserId;
     if (userId == null) return {};
 
-    // TODO: Filter manual dihilangkan sementara karena user_id lama beda
-    // final isAdmin = _isAdmin;
+    final isAdmin = await _isAdmin;
 
     final response = await _client
         .from('tickets')
-        .select('status');
+        .select('status, user_id');
 
-    // Sementara tampilkan semua tiket untuk stats
-    final List filtered = response as List;
+    // Filter: admin/helpdesk lihat semua, user biasa hanya milik sendiri
+    final List filtered = isAdmin
+        ? response as List
+        : (response as List).where((t) => t['user_id'] == userId).toList();
 
     final stats = <String, int>{
       'total': filtered.length,

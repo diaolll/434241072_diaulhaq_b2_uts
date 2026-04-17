@@ -25,15 +25,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _load() async {
-    final sb = SupabaseService.currentUser;
-    if (sb != null) {
-      setState(() {
-        _name = sb.userMetadata?['name'] ?? sb.email?.split('@')[0];
-        _email = sb.email;
-        _role = sb.userMetadata?['role'] ?? 'user';
-      });
-      return;
-    }
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _name = prefs.getString('user_name');
@@ -115,10 +106,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Text(_email ?? '', style: TextStyle(fontSize: 12, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
                       ],
                     ),
-                  ),
-                  GestureDetector(
-                    onTap: () => context.push('/profile'),
-                    child: Text('Edit', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
                   ),
                 ],
               ),
