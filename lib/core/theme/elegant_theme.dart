@@ -184,7 +184,7 @@ class ElegantTheme {
         color: white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: gray200.withOpacity(0.8), width: 1),
+          side: BorderSide(color: gray200.withValues(alpha: 0.8), width: 1),
         ),
         margin: EdgeInsets.zero,
       ),

@@ -711,7 +711,7 @@ class _HistoryCard extends StatelessWidget {
         ? (history as Map)['user']
         : history.user;
     final userName = user is Map
-        ? (user as Map)['name'] as String? ?? 'Unknown'
+        ? user['name'] ?? 'Unknown'
         : (user as dynamic)?.name ?? 'Unknown';
     final createdAt = history is Map
         ? (history as Map)['created_at'] != null
