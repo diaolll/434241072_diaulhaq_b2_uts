@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../../data/providers/providers.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -51,60 +50,67 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context.isDark;
     return Scaffold(
-      backgroundColor: isDark ? AppTheme.dark0 : AppTheme.white,
-      body: Center(
-        child: FadeTransition(
-          opacity: _fade,
-          child: ScaleTransition(
-            scale: _scale,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: isDark ? AppTheme.white : AppTheme.black,
-                    borderRadius: BorderRadius.circular(18),
+      body: Container(
+        color: Colors.white,
+        child: Center(
+          child: FadeTransition(
+            opacity: _fade,
+            child: ScaleTransition(
+              scale: _scale,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // App Icon / Logo - Lebih kecil
+                  Image.asset(
+                    'assets/logo/logoipsum-411.png',
+                    width: 60,  // Diperkecil dari 100
+                    height: 60, // Diperkecil dari 100
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Icon(
+                        Icons.help_outline,
+                        size: 60,
+                        color: Color(0xFF1976D2),
+                      );
+                    },
                   ),
-                  child: Icon(
-                    Icons.support_agent_rounded,
-                    size: 36,
-                    color: isDark ? AppTheme.black : AppTheme.white,
+                  const SizedBox(height: 24),
+                  // App Name
+                  const Text(
+                    'tsmobileniech',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                      letterSpacing: -0.5,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'HelpDesk',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.8,
-                    color: isDark ? AppTheme.white : AppTheme.black,
+                  const SizedBox(height: 6),
+                  // Subtitle
+                  Text(
+                    'E-Ticketing Helpdesk',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.grey[600],
+                      letterSpacing: 0.3,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'E-Ticketing System',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w400,
-                    color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary,
-                    letterSpacing: 0.2,
+                  const SizedBox(height: 64),
+                  // Loading Indicator
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Colors.blue,
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 48),
-                SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: isDark ? AppTheme.white : AppTheme.black,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

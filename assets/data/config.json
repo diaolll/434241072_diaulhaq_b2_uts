@@ -1,0 +1,20 @@
+{
+  "app_name": "E-Ticketing Helpdesk",
+  "version": "1.0.0",
+  "features": {
+    "ticket_management": true,
+    "user_authentication": true,
+    "notifications": true,
+    "file_upload": true
+  },
+  "support": {
+    "email": "support@example.com",
+    "phone": "+1234567890",
+    "faq_url": "https://example.com/faq"
+  },
+  "theme": {
+    "primary_color": "#2196F3",
+    "secondary_color": "#FFC107",
+    "text_color": "#333333"
+  }
+}

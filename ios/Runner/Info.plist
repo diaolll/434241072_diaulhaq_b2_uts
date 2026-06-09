@@ -71,5 +71,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>We need camera access to let you upload photos for tickets</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We need photo library access to let you upload photos for tickets</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>We need to save photos to your library</string>
 </dict>
 </plist>
