@@ -239,7 +239,6 @@ class _Field extends StatelessWidget {
   final Widget? suffix;
   final String? Function(String?)? validator;
   final bool isDark;
-  final int maxLines;
 
   const _Field({
     required this.controller,
@@ -249,7 +248,6 @@ class _Field extends StatelessWidget {
     this.type = TextInputType.text,
     this.suffix,
     this.validator,
-    this.maxLines = 1,
   });
 
   @override
@@ -258,7 +256,7 @@ class _Field extends StatelessWidget {
       controller: controller,
       obscureText: obscure,
       keyboardType: type,
-      maxLines: obscure ? 1 : maxLines,
+      maxLines: obscure ? 1 : 1,
       validator: validator,
       style: TextStyle(
         fontSize: 15,
