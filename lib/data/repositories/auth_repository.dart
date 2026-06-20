@@ -55,6 +55,7 @@ class AuthRepository {
           email: email,
           role: role,
           createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
         ),
       };
     } catch (e) {
@@ -97,6 +98,7 @@ class AuthRepository {
         email: email,
         role: 'user',
         createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
     } catch (e) {
       print('❌ Register error: $e');
@@ -132,6 +134,7 @@ class AuthRepository {
       email: user.email ?? '',
       role: metadata['role'] ?? 'user',
       createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
     );
   }
 
@@ -169,12 +172,12 @@ class AuthRepository {
     return _client.auth.currentUser != null;
   }
 
-  /// Pastikan user ada di tabel users (pakai upsert)
-  /// Jangan override role yang sudah ada di database
+  /// Pastikan user ada di tabel users (pakai function upsert_user)
+  /// Function ini bypass RLS jadi aman digunakan
   Future<void> _ensureUserExists(User user) async {
     final metadata = user.userMetadata ?? {};
 
-    // Cek dulu apakah user sudah ada
+    // Cek dulu apakah user sudah ada (bisa fail karena RLS, tapi abaikan saja)
     final existing = await _client
         .from('users')
         .select('role')
@@ -185,14 +188,13 @@ class AuthRepository {
                  metadata['role'] ??
                  'user';
 
-    // Upsert - insert atau update jika sudah ada
-    // Tapi jangan override role jika sudah ada
-    await _client.from('users').upsert({
-      'id': user.id,
-      'email': user.email,
-      'name': metadata['name'] ?? user.email?.split('@')[0],
-      'role': role,  // Pakai role dari database jika ada
-    }, onConflict: 'id');
+    // Gunakan function upsert_user yang bypass RLS
+    await _client.rpc('upsert_user', params: {
+      'p_id': user.id,
+      'p_email': user.email ?? '',
+      'p_name': metadata['name'] ?? user.email?.split('@')[0] ?? '',
+      'p_role': role,
+    });
 
     print('✅ Upsert user: ${user.id} with role: $role');
   }

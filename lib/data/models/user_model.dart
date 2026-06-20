@@ -2,33 +2,32 @@ class UserModel {
   final String id;
   final String name;
   final String email;
-  final String phone;
   final String role;
-  final String department;
-  final String? avatar;
+  final String? avatarUrl;
   final DateTime createdAt;
+  final DateTime updatedAt;
 
   UserModel({
     required this.id,
     required this.name,
     required this.email,
-    this.phone = '',
     required this.role,
-    this.department = '',
-    this.avatar,
+    this.avatarUrl,
     required this.createdAt,
+    required this.updatedAt,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
         id: json['id']?.toString() ?? '',
         name: json['name']?.toString() ?? '',
         email: json['email']?.toString() ?? '',
-        phone: json['phone']?.toString() ?? '',
         role: json['role']?.toString() ?? 'user',
-        department: json['department']?.toString() ?? '',
-        avatar: json['avatar']?.toString() ?? json['avatar_url']?.toString(),
+        avatarUrl: json['avatar_url']?.toString(),
         createdAt: json['created_at'] != null
             ? DateTime.parse(json['created_at'])
+            : DateTime.now(),
+        updatedAt: json['updated_at'] != null
+            ? DateTime.parse(json['updated_at'])
             : DateTime.now(),
       );
 
@@ -36,12 +35,10 @@ class UserModel {
         'id': id,
         'name': name,
         'email': email,
-        'phone': phone,
         'role': role,
-        'department': department,
-        'avatar': avatar,
-        'avatar_url': avatar,
+        'avatar_url': avatarUrl,
         'created_at': createdAt.toIso8601String(),
+        'updated_at': updatedAt.toIso8601String(),
       };
 
   // Computed properties
@@ -54,5 +51,38 @@ class UserModel {
 
   String get displayName => name;
   bool get isAdmin => role == 'admin';
-  bool get isSupport => role == 'support' || role == 'admin';
+  bool get isHelpdesk => role == 'helpdesk';
+  bool get isUser => role == 'user';
+
+  /// Role label in Indonesian
+  String get roleLabel {
+    switch (role) {
+      case 'admin':
+        return 'Administrator';
+      case 'helpdesk':
+        return 'Helpdesk';
+      default:
+        return 'Pengguna';
+    }
+  }
+
+  UserModel copyWith({
+    String? id,
+    String? name,
+    String? email,
+    String? role,
+    String? avatarUrl,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return UserModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      role: role ?? this.role,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
 }

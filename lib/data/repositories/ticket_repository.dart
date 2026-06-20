@@ -15,24 +15,20 @@ class TicketRepository {
     return prefs.getString('user_role') ?? 'user';
   }
 
-  /// Check if current user is admin/helpdesk
-  Future<bool> get _isAdmin async {
-    final role = await _currentRole;
-    return role == 'admin' || role == 'helpdesk';
-  }
-
-  /// Get all tickets - admin/helpdesk see all, users see own
+  /// Get all tickets
+  /// - Admin: semua tiket
+  /// - Helpdesk: hanya tiket yang ditugaskan ke mereka (assigned_to)
+  /// - User biasa: hanya tiket milik sendiri
   Future<List<TicketModel>> getTickets() async {
     final userId = _currentUserId;
     if (userId == null) throw Exception('User not authenticated');
 
     final role = await _currentRole;
-    final isAdmin = await _isAdmin;
 
-    print('🎫 GetTickets: userId=$userId, role=$role, isAdmin=$isAdmin');
+    print('🎫 GetTickets: userId=$userId, role=$role');
 
     try {
-      // Admin/Helpdesk lihat semua tiket, user biasa hanya milik sendiri
+      // Ambil semua tiket dulu
       final response = await _client
           .from('tickets')
           .select()
@@ -40,9 +36,22 @@ class TicketRepository {
 
       print('🎫 Raw response count: ${response.length}');
 
-      final List filtered = isAdmin
-          ? response as List
-          : (response as List).where((t) => t['user_id'] == userId).toList();
+      // Filter berdasarkan role
+      List filtered;
+      if (role == 'admin') {
+        // Admin lihat semua tiket
+        filtered = response as List;
+      } else if (role == 'helpdesk') {
+        // Helpdesk hanya lihat tiket yang ditugaskan ke mereka
+        filtered = (response as List)
+            .where((t) => t['assigned_to'] == userId)
+            .toList();
+      } else {
+        // User biasa hanya lihat tiket milik sendiri
+        filtered = (response as List)
+            .where((t) => t['user_id'] == userId)
+            .toList();
+      }
 
       print('🎫 Filtered count: ${filtered.length}');
 
@@ -157,7 +166,7 @@ class TicketRepository {
     }
   }
 
-  /// Create new ticket - hanya role 'user' yang bisa membuat tiket
+  /// Create new ticket - semua role yang sudah login bisa membuat tiket
   Future<TicketModel> createTicket({
     required String title,
     required String description,
@@ -170,12 +179,9 @@ class TicketRepository {
       throw Exception('User not authenticated. Please login first.');
     }
 
-    // Cek role - hanya user biasa yang bisa buat tiket
+    // Semua role yang sudah login bisa membuat tiket
     final role = await _currentRole;
-    if (role != 'user') {
-      print('❌ Only regular users can create tickets. Current role: $role');
-      throw Exception('Hanya user biasa yang dapat membuat tiket. Admin dan Helpdesk tidak perlu membuat tiket.');
-    }
+    print('🎫 Creating ticket: userId=$userId, role=$role, title=$title');
 
     print('📝 Creating ticket: userId=$userId, title=$title');
 
@@ -371,21 +377,38 @@ class TicketRepository {
     }
   }
 
-  /// Get dashboard stats - for admin/helpdesk, return all tickets
+  /// Get dashboard stats
+  /// - Admin: semua tiket
+  /// - Helpdesk: hanya tiket yang ditugaskan ke mereka (assigned_to)
+  /// - User biasa: hanya tiket milik sendiri
   Future<Map<String, int>> getDashboardStats() async {
     final userId = _currentUserId;
     if (userId == null) return {};
 
-    final isAdmin = await _isAdmin;
+    final role = await _currentRole;
 
     final response = await _client
         .from('tickets')
-        .select('status, user_id');
+        .select('status, user_id, assigned_to');
 
-    // Filter: admin/helpdesk lihat semua, user biasa hanya milik sendiri
-    final List filtered = isAdmin
-        ? response as List
-        : (response as List).where((t) => t['user_id'] == userId).toList();
+    // Filter berdasarkan role
+    List filtered;
+    if (role == 'admin') {
+      // Admin lihat semua tiket
+      filtered = response as List;
+    } else if (role == 'helpdesk') {
+      // Helpdesk hanya lihat tiket yang ditugaskan ke mereka
+      filtered = (response as List)
+          .where((t) => t['assigned_to'] == userId)
+          .toList();
+    } else {
+      // User biasa hanya lihat tiket milik sendiri
+      filtered = (response as List)
+          .where((t) => t['user_id'] == userId)
+          .toList();
+    }
+
+    print('📊 Stats: role=$role, filtered=${filtered.length} tickets');
 
     final stats = <String, int>{
       'total': filtered.length,

@@ -64,7 +64,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       if (mounted) setState(() => _loading = false);
     }
 
-    // Load helpdesk list jika admin/helpdesk
+    // Load helpdesk list hanya untuk admin (untuk assign tiket)
     if (_isAdmin) {
       _loadHelpdeskList();
     }
@@ -80,7 +80,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     }
   }
 
-  bool get _isAdmin => _userRole == 'admin' || _userRole == 'helpdesk';
+  bool get _isAdmin => _userRole == 'admin';
+
+  bool get _isHelpdesk => _userRole == 'helpdesk';
+
+  bool get _canManageTickets => _isAdmin || _isHelpdesk;
 
   Future<void> _addComment() async {
     if (_commentCtrl.text.trim().isEmpty) return;
@@ -273,10 +277,46 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             ),
           ),
 
-          // ── Admin Actions ─────────────────────────────────────────────
+          // ── Assign Info (Show to Helpdesk too) ─────────────────────────
+          if (_canManageTickets && t.assignedTo != null) ...[
+            const SizedBox(height: 16),
+            _Card(
+              isDark: isDark,
+              child: Row(
+                children: [
+                  Icon(Icons.person_outline_rounded, size: 16, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Assigned to: ',
+                    style: TextStyle(fontSize: 13, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
+                  ),
+                  Expanded(
+                    child: Text(
+                      t.assignee?.name ?? 'Belum di-assign',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: isDark ? AppTheme.white : AppTheme.black),
+                    ),
+                  ),
+                  if (_isHelpdesk && t.assignedTo == SupabaseService.client.auth.currentUser?.id)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.statusInProgress.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'YOU',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppTheme.statusInProgress),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+
+          // ── Admin Actions (Assign only) ─────────────────────────────────
           if (_isAdmin) ...[
             const SizedBox(height: 16),
-            // Assign Section
+            // Assign Section - ADMIN ONLY
             Text('Assign Tiket', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
             const SizedBox(height: 10),
             _Card(
@@ -284,24 +324,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Show current assignee
-                  Row(
-                    children: [
-                      Icon(Icons.person_outline_rounded, size: 16, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Assigned to: ',
-                        style: TextStyle(fontSize: 13, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
-                      ),
-                      Expanded(
-                        child: Text(
-                          t.assignee?.name ?? 'Belum di-assign',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: isDark ? AppTheme.white : AppTheme.black),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
                   // Dropdown to assign
                   if (_loadingHelpdesk)
                     SizedBox(
@@ -346,7 +368,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+          ],
+
+          // ── Status Update (Admin + Helpdesk) ───────────────────────────
+          if (_canManageTickets) ...[
+            if (_isHelpdesk) const SizedBox(height: 16),
             Text('Update Status', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
             const SizedBox(height: 10),
             Wrap(

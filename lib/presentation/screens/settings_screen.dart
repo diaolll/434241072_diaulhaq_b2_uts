@@ -182,6 +182,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _MenuCard(isDark: isDark, items: [
             _MenuItem(icon: Icons.lock_outline_rounded, label: 'Ganti Password', isDark: isDark, onTap: () => context.push('/reset-password')),
             _MenuItem(icon: Icons.badge_outlined, label: 'Role', value: (_role ?? 'user').toUpperCase(), isDark: isDark),
+            if (_role == 'admin')
+              _MenuItem(icon: Icons.people_outline_rounded, label: 'Kelola Pengguna', isDark: isDark, onTap: () => context.push('/users')),
           ]),
           const SizedBox(height: 20),
 

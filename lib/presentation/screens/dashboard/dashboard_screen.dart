@@ -43,8 +43,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     // Debug: print unread count
     print('🔔 Dashboard build - unreadCount: $unreadCount');
 
-    // Hanya user biasa yang bisa buat tiket
-    final canCreateTicket = _userRole == 'user';
+    // Semua role yang sudah login bisa buat tiket
+    final canCreateTicket = _userRole != null && _userRole!.isNotEmpty;
 
     return Scaffold(
       backgroundColor: isDark ? AppTheme.dark0 : AppTheme.surface1,

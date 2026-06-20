@@ -11,6 +11,8 @@ import '../../presentation/screens/tickets/create_ticket_screen.dart';
 import '../../presentation/screens/profile_screen.dart';
 import '../../presentation/screens/settings_screen.dart';
 import '../../presentation/screens/notification_screen.dart';
+import '../../presentation/screens/users/user_list_screen.dart';
+import '../../presentation/screens/users/user_detail_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -26,12 +28,8 @@ final appRouter = GoRouter(
 
     // Role-based access control
     if (isAuth) {
-      final role = prefs.getString('user_role') ?? 'user';
-
-      // Hanya role 'user' yang bisa buat tiket
-      if (loc == '/tickets/create' && role != 'user') {
-        return '/tickets';
-      }
+      // Semua role yang sudah login bisa buat tiket
+      // Tidak ada restriction untuk /tickets/create
     }
 
     return null;
@@ -52,5 +50,11 @@ final appRouter = GoRouter(
     GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
     GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
     GoRoute(path: '/notifications', builder: (_, __) => const NotificationScreen()),
+    // User Management (Admin only)
+    GoRoute(path: '/users', builder: (_, __) => const UserListScreen()),
+    GoRoute(
+      path: '/users/:id',
+      builder: (_, state) => UserDetailScreen(userId: state.pathParameters['id']!),
+    ),
   ],
 );

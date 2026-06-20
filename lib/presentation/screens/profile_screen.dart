@@ -40,6 +40,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         email: email ?? 'demo@example.com',
         role: role ?? 'user',
         createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
       _loading = false;
     });

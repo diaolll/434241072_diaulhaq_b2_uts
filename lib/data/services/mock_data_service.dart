@@ -16,11 +16,10 @@ class MockDataService {
       id: 'user_001',
       name: 'John Doe',
       email: 'john.doe@example.com',
-      phone: '+62 812 3456 7890',
       role: 'user',
-      department: 'Engineering',
-      avatar: null,
+      avatarUrl: null,
       createdAt: DateTime.now().subtract(const Duration(days: 365)),
+      updatedAt: DateTime.now(),
     );
     return _currentUser!;
   }
@@ -79,11 +78,9 @@ class MockDataService {
             id: 'tech_001',
             name: 'Support Team',
             email: 'support@company.com',
-            phone: '',
-            role: 'support',
-            department: 'IT Support',
-            avatar: null,
+            role: 'helpdesk',
             createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
           ),
         ),
         CommentModel(
@@ -136,11 +133,9 @@ class MockDataService {
             id: 'tech_002',
             name: 'Admin IT',
             email: 'admin@company.com',
-            phone: '',
             role: 'admin',
-            department: 'IT',
-            avatar: null,
             createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
           ),
         ),
       ],
@@ -171,11 +166,9 @@ class MockDataService {
             id: 'tech_001',
             name: 'Support Team',
             email: 'support@company.com',
-            phone: '',
-            role: 'support',
-            department: 'IT Support',
-            avatar: null,
+            role: 'helpdesk',
             createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
           ),
         ),
       ],
@@ -322,11 +315,10 @@ class MockDataService {
         id: 'user_${DateTime.now().millisecondsSinceEpoch}',
         name: email.split('@')[0].replaceAll('.', ' ').capitalize(),
         email: email,
-        phone: '+62 812 3456 7890',
         role: 'user',
-        department: 'Engineering',
-        avatar: null,
+        avatarUrl: null,
         createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
       return true;
     }
@@ -344,11 +336,10 @@ class MockDataService {
         id: 'user_${DateTime.now().millisecondsSinceEpoch}',
         name: name,
         email: email,
-        phone: '',
         role: 'user',
-        department: '',
-        avatar: null,
+        avatarUrl: null,
         createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
       return true;
     }
