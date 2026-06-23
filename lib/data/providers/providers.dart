@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../repositories/ticket_repository.dart';
 import '../repositories/auth_repository.dart';
 import '../models/ticket_model.dart';
@@ -162,9 +163,28 @@ class TicketsNotifier extends StateNotifier<TicketsState> {
       final tickets = await _repo.getTickets();
       final stats = await _repo.getDashboardStats();
 
+      print('📊 Provider loaded - tickets: ${tickets.length}, stats: $stats');
+
+      // Load system stats untuk admin ONLY
+      Map<String, dynamic> systemStats = {};
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final role = prefs.getString('user_role') ?? 'user';
+        if (role == 'admin') {
+          final statsData = await _repo.getSystemStats();
+          // Only populate if we got valid data (non-empty)
+          if (statsData.isNotEmpty) {
+            systemStats = statsData;
+          }
+        }
+      } catch (e) {
+        print('⚠️ Failed to load system stats: $e');
+      }
+
       state = state.copyWith(
         tickets: tickets,
         stats: stats,
+        systemStats: systemStats,
         isLoading: false,
       );
     } catch (e) {
@@ -173,6 +193,7 @@ class TicketsNotifier extends StateNotifier<TicketsState> {
         error: e.toString(),
         tickets: [],
         stats: {},
+        systemStats: {},
       );
     }
   }
@@ -258,6 +279,7 @@ class TicketsNotifier extends StateNotifier<TicketsState> {
 class TicketsState {
   final List<TicketModel> tickets;
   final Map<String, int> stats;
+  final Map<String, dynamic> systemStats; // Stats sistem untuk Admin
   final bool isLoading;
   final bool isSubmitting;
   final String? error;
@@ -265,6 +287,7 @@ class TicketsState {
   TicketsState({
     this.tickets = const [],
     this.stats = const {},
+    this.systemStats = const {},
     this.isLoading = false,
     this.isSubmitting = false,
     this.error,
@@ -275,6 +298,7 @@ class TicketsState {
   TicketsState copyWith({
     List<TicketModel>? tickets,
     Map<String, int>? stats,
+    Map<String, dynamic>? systemStats,
     bool? isLoading,
     bool? isSubmitting,
     String? error,
@@ -282,6 +306,7 @@ class TicketsState {
     return TicketsState(
       tickets: tickets ?? this.tickets,
       stats: stats ?? this.stats,
+      systemStats: systemStats ?? this.systemStats,
       isLoading: isLoading ?? this.isLoading,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       error: error,

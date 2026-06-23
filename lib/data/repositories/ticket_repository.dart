@@ -426,6 +426,85 @@ class TicketRepository {
     return stats;
   }
 
+  /// Get system stats untuk Admin (statistik sistem lengkap)
+  Future<Map<String, dynamic>> getSystemStats() async {
+    try {
+      // 1. Stats tiket by category
+      final categoryResponse = await _client
+          .from('tickets')
+          .select('category');
+
+      final categoryStats = <String, int>{};
+      for (var t in categoryResponse) {
+        final cat = t['category'] as String? ?? 'Uncategorized';
+        categoryStats[cat] = (categoryStats[cat] ?? 0) + 1;
+      }
+
+      // 2. Stats tiket by priority
+      final priorityResponse = await _client
+          .from('tickets')
+          .select('priority');
+
+      final priorityStats = <String, int>{};
+      for (var t in priorityResponse) {
+        final prio = t['priority'] as String? ?? 'medium';
+        priorityStats[prio] = (priorityStats[prio] ?? 0) + 1;
+      }
+
+      // 3. Stats activity hari ini
+      final today = DateTime.now();
+      final startOfDay = DateTime(today.year, today.month, today.day).toIso8601String();
+
+      // Tiket baru yang dibuat hari ini
+      final newTicketsResponse = await _client
+          .from('tickets')
+          .select('created_at')
+          .gte('created_at', startOfDay);
+
+      final newToday = newTicketsResponse.length;
+
+      // Tiket yang selesai (resolved/closed) hari ini - berdasarkan updated_at
+      // Note: Perlu field updated_at di tabel tickets untuk tracking ini
+      // Untuk sekarang, kita hitung tiket resolved/closed yang ada di database
+      final resolvedResponse = await _client
+          .from('tickets')
+          .select('created_at, updated_at')
+          .inFilter('status', ['resolved', 'closed']);
+
+      int resolvedToday = 0;
+      for (var t in resolvedResponse) {
+        final updatedAt = t['updated_at'] as String? ?? t['created_at'] as String? ?? '';
+        if (updatedAt.startsWith(startOfDay.substring(0, 10))) {
+          resolvedToday++;
+        }
+      }
+
+      // 4. Stats user per role
+      final usersResponse = await _client
+          .from('users')
+          .select('role');
+
+      final userRoleStats = <String, int>{};
+      for (var u in usersResponse) {
+        final role = u['role'] as String? ?? 'user';
+        userRoleStats[role] = (userRoleStats[role] ?? 0) + 1;
+      }
+
+      return {
+        'category': categoryStats,
+        'priority': priorityStats,
+        'activity': {
+          'new_today': newToday,
+          'resolved_today': resolvedToday,
+        },
+        'users': userRoleStats,
+      };
+    } catch (e) {
+      print('❌ Error getting system stats: $e');
+      return {}; // Return empty map on error
+    }
+  }
+
   /// Get notifications for current user
   Future<List<dynamic>> getNotifications() async {
     final userId = _currentUserId;

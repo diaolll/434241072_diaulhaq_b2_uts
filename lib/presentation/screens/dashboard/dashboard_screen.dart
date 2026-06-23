@@ -15,6 +15,7 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   int _tab = 0;
+  int _statsTab = 0; // 0 = Kategori, 1 = Prioritas, 2 = Role, 3 = Aktivitas
   String? _userRole;
 
   @override
@@ -147,14 +148,62 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
               ),
 
-              // ── Chart Section ─────────────────────────────────────────────
-              if (!ticketsState.isLoading && stats.isNotEmpty)
+              // ── Chart Section (Non-Admin Only) ───────────────────────────
+              if (!ticketsState.isLoading && stats.isNotEmpty && _userRole != 'admin')
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                     child: _ChartCard(stats: stats, isDark: isDark),
                   ),
                 ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+
+              // ── System Stats untuk Admin ONLY ─────────────────────────────
+              if (_userRole == 'admin' &&
+                  !ticketsState.isLoading &&
+                  ticketsState.systemStats.isNotEmpty &&
+                  (ticketsState.systemStats['category'] as Map?)?.isNotEmpty == true) ...[
+                // ── Chart Section (berdasarkan tab) ────────────────────────────
+                // Skip chart untuk tab Aktivitas (index 3)
+                if (!ticketsState.isLoading && ticketsState.systemStats.isNotEmpty && _statsTab != 3)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      child: _AdminChartCard(
+                        systemStats: ticketsState.systemStats,
+                        isDark: isDark,
+                        tabIndex: _statsTab,
+                      ),
+                    ),
+                  ),
+
+                // ── Admin Stats Tabs ───────────────────────────────────────────
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                    child: _AdminStatsTabs(
+                      selected: _statsTab,
+                      onChanged: (i) => setState(() => _statsTab = i),
+                      isDark: isDark,
+                    ),
+                  ),
+                ),
+
+                // ── Stats List (berdasarkan tab) ───────────────────────────────
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                    child: _AdminStatsList(
+                      systemStats: ticketsState.systemStats,
+                      isDark: isDark,
+                      tabIndex: _statsTab,
+                    ),
+                  ),
+                ),
+
+                const SliverToBoxAdapter(child: SizedBox(height: 12)),
+              ],
 
               // ── Recent Tickets ────────────────────────────────────────────
               SliverToBoxAdapter(
@@ -819,6 +868,369 @@ class _NavItem extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Admin Stats Tabs Widget ──────────────────────────────────────────────────
+
+class _AdminStatsTabs extends StatelessWidget {
+  final int selected;
+  final ValueChanged<int> onChanged;
+  final bool isDark;
+
+  const _AdminStatsTabs({
+    required this.selected,
+    required this.onChanged,
+    required this.isDark,
+  });
+
+  static const List<String> _tabs = ['Kategori', 'Prioritas', 'Role', 'Aktivitas'];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.dark2 : AppTheme.surface2,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: List.generate(_tabs.length, (index) {
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => onChanged(index),
+              child: AnimatedContainer(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: selected == index
+                      ? (isDark ? AppTheme.dark0 : AppTheme.white)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                duration: const Duration(milliseconds: 200),
+                child: Text(
+                  _tabs[index],
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: selected == index ? FontWeight.w600 : FontWeight.w500,
+                    color: selected == index
+                        ? (isDark ? AppTheme.white : AppTheme.black)
+                        : (isDark ? AppTheme.textTertiaryDark : AppTheme.textTertiary),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+// ── Admin Chart Card (berubah sesuai tab) ───────────────────────────────────────
+
+class _AdminChartCard extends StatelessWidget {
+  final Map<String, dynamic> systemStats;
+  final bool isDark;
+  final int tabIndex;
+
+  const _AdminChartCard({
+    required this.systemStats,
+    required this.isDark,
+    required this.tabIndex,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final categoryStats = systemStats['category'] as Map<String, int>? ?? {};
+    final priorityStats = systemStats['priority'] as Map<String, int>? ?? {};
+    final userStats = systemStats['users'] as Map<String, int>? ?? {};
+    final activity = systemStats['activity'] as Map<String, dynamic>? ?? {};
+
+    String chartTitle;
+    List<MapEntry<String, int>> data;
+    List<Color> colors;
+
+    switch (tabIndex) {
+      case 0:
+        chartTitle = 'Tiket per Kategori';
+        data = categoryStats.entries.toList();
+        colors = _generateColors(data.length, baseHue: 200);
+        break;
+      case 1:
+        chartTitle = 'Tiket per Prioritas';
+        data = priorityStats.entries.toList();
+        final order = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3};
+        data.sort((a, b) => (order[a.key.toLowerCase()] ?? 99).compareTo(order[b.key.toLowerCase()] ?? 99));
+        colors = [Colors.red, Colors.orange, Colors.amber, Colors.green];
+        break;
+      case 2:
+        chartTitle = 'Pengguna per Role';
+        data = userStats.entries.toList();
+        colors = [AppTheme.statusInProgress, Colors.purple, AppTheme.statusOpen];
+        break;
+      case 3:
+        chartTitle = 'Aktivitas Hari Ini';
+        data = [
+          MapEntry('Baru', activity['new_today'] as int? ?? 0),
+          MapEntry('Selesai', activity['resolved_today'] as int? ?? 0),
+        ];
+        colors = [AppTheme.statusOpen, Colors.green];
+        break;
+      default:
+        chartTitle = '';
+        data = [];
+        colors = [];
+    }
+
+    if (data.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(20, 20, 28, 20),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.dark1 : AppTheme.surface0,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
+        ),
+        child: Center(
+          child: Text(
+            'Belum ada data',
+            style: TextStyle(
+              fontSize: 13,
+              color: isDark ? AppTheme.textTertiaryDark : AppTheme.textTertiary,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(62, 20, 20, 32),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.dark1 : AppTheme.surface0,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            chartTitle,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: isDark ? AppTheme.white : AppTheme.black,
+            ),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 160,
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 1,
+                  child: PieChart(
+                    PieChartData(
+                      sectionsSpace: 2,
+                      centerSpaceRadius: 36,
+                      sections: List.generate(data.length, (i) {
+                        return PieChartSectionData(
+                          value: data[i].value.toDouble(),
+                          color: colors.length > i ? colors[i] : Colors.grey,
+                          radius: 52,
+                          title: '',
+                        );
+                      }),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 62),
+                Expanded(
+                  flex: 1,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: List.generate(data.length, (i) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                constraints: const BoxConstraints(
+                                  minWidth: 8,
+                                  minHeight: 8,
+                                  maxWidth: 8,
+                                  maxHeight: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colors.length > i ? colors[i] : Colors.grey,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '${data[i].key}  ${data[i].value}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Color> _generateColors(int count, {double baseHue = 200}) {
+    return List.generate(count, (i) {
+      return HSVColor.fromAHSV(1.0, (baseHue + i * 40) % 360, 0.7, 1.0).toColor();
+    });
+  }
+}
+
+// ── Admin Stats List (detail per tab) ───────────────────────────────────────────
+
+class _AdminStatsList extends StatelessWidget {
+  final Map<String, dynamic> systemStats;
+  final bool isDark;
+  final int tabIndex;
+
+  const _AdminStatsList({
+    required this.systemStats,
+    required this.isDark,
+    required this.tabIndex,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final categoryStats = systemStats['category'] as Map<String, int>? ?? {};
+    final priorityStats = systemStats['priority'] as Map<String, int>? ?? {};
+    final userStats = systemStats['users'] as Map<String, int>? ?? {};
+    final activity = systemStats['activity'] as Map<String, dynamic>? ?? {};
+
+    List<_StatItem> items;
+
+    switch (tabIndex) {
+      case 0:
+        items = categoryStats.entries.map((e) => _StatItem(label: e.key, value: e.value, isDark: isDark)).toList();
+        break;
+      case 1:
+        items = priorityStats.entries.map((e) => _StatItem(
+          label: e.key.toUpperCase(),
+          value: e.value,
+          isDark: isDark,
+          getValueColor: (val) {
+            if (e.key == 'critical') return Colors.red;
+            if (e.key == 'high') return Colors.orange;
+            if (e.key == 'medium') return Colors.amber;
+            return Colors.green;
+          },
+        )).toList();
+        break;
+      case 2:
+        items = userStats.entries.map((e) => _StatItem(
+          label: e.key.toUpperCase(),
+          value: e.value,
+          isDark: isDark,
+          getLabelColor: (label) {
+            if (label == 'ADMIN') return AppTheme.statusInProgress;
+            if (label == 'HELPDESK') return Colors.purple;
+            return AppTheme.statusOpen;
+          },
+        )).toList();
+        break;
+      case 3:
+        items = [
+          _StatItem(label: 'Baru', value: activity['new_today'] ?? 0, isDark: isDark),
+          _StatItem(label: 'Selesai', value: activity['resolved_today'] ?? 0, isDark: isDark, getValueColor: (v) => Colors.green),
+        ];
+        break;
+      default:
+        items = [];
+    }
+
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.dark1 : AppTheme.surface0,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Divider(height: 1, thickness: 0.5, color: Color(0xFFE0E0E0)),
+        ),
+        itemBuilder: (_, i) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: items[i],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Stat Item Widget ─────────────────────────────────────────────────────────────
+
+class _StatItem extends StatelessWidget {
+  final String label;
+  final int value;
+  final bool isDark;
+  final Color Function(int)? getValueColor;
+  final Color Function(String)? getLabelColor;
+
+  const _StatItem({
+    required this.label,
+    required this.value,
+    required this.isDark,
+    this.getValueColor,
+    this.getLabelColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final valueColor = getValueColor?.call(value) ?? (isDark ? AppTheme.white : AppTheme.black);
+    final labelColor = getLabelColor?.call(label) ?? (isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary);
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Flexible(
+          child: Text(
+            label,
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: labelColor),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        Text(
+          '$value',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: valueColor),
+        ),
+      ],
     );
   }
 }
