@@ -168,6 +168,88 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     }
   }
 
+  Future<void> _reopenTicket() async {
+    final isDark = context.isDark;
+    final reasonCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppTheme.dark1 : AppTheme.surface0,
+        title: Text('Buka Tiket Kembali',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: isDark ? AppTheme.white : AppTheme.black)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Kenapa tiket ini ingin dibuka kembali?',
+                style: TextStyle(fontSize: 13, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonCtrl,
+              style: TextStyle(color: isDark ? AppTheme.white : AppTheme.black, fontSize: 14),
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'Jelaskan alasan...',
+                filled: true,
+                fillColor: isDark ? AppTheme.dark2 : AppTheme.surface1,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: isDark ? AppTheme.white : AppTheme.black, width: 1),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Batal', style: TextStyle(color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () {
+              if (reasonCtrl.text.trim().isEmpty) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(content: Text('Alasan harus diisi'), backgroundColor: Colors.red),
+                );
+                return;
+              }
+              Navigator.pop(ctx, true);
+            },
+            child: Text('Reopen', style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? AppTheme.white : AppTheme.black)),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      setState(() => _submitting = true);
+      try {
+        await _repo.reopenTicket(widget.ticketId, reasonCtrl.text.trim());
+        await _load();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Tiket berhasil dibuka kembali'), backgroundColor: Colors.orange),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Gagal: $e'), backgroundColor: AppTheme.priorityHigh),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _submitting = false);
+      }
+    }
+    reasonCtrl.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = context.isDark;
@@ -390,6 +472,34 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                           Icon(Icons.check_circle_outline, size: 18),
                           const SizedBox(width: 8),
                           Text('Selesaikan Tiket', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+              ),
+            ),
+          ],
+
+          // ── User Actions (Reopen button for ticket creator) ───────────────
+          if (!_isAdmin && !_isHelpdesk && t.status == 'closed' && t.userId == SupabaseService.client.auth.currentUser?.id) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _submitting ? null : _reopenTicket,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                child: _submitting
+                    ? SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.refresh_rounded, size: 18),
+                          const SizedBox(width: 8),
+                          Text('Buka Tiket Kembali', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                         ],
                       ),
               ),

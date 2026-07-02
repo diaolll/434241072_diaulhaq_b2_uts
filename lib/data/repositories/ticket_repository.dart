@@ -335,6 +335,42 @@ class TicketRepository {
     }
   }
 
+  /// Reopen ticket - changes status from 'closed' back to 'open'
+  Future<void> reopenTicket(String id, String reason) async {
+    final userId = _currentUserId;
+    if (userId == null) throw Exception('User not authenticated');
+
+    // Update status to open
+    await _client
+        .from('tickets')
+        .update({'status': 'open', 'assigned_to': null})
+        .eq('id', id);
+
+    // Add to history
+    await _client.from('ticket_history').insert({
+      'ticket_id': id,
+      'changed_by': userId,
+      'old_status': 'closed',
+      'new_status': 'open',
+      'note': 'Dibuka kembali: $reason',
+    });
+
+    // Get ticket details for notification
+    final ticket = await _client.from('tickets').select('*').eq('id', id).maybeSingle();
+    if (ticket != null) {
+      final ticketNo = ticket['ticket_no'] ?? '';
+      final title = ticket['title'] ?? '';
+
+      // Notify admins and helpdesk about reopened ticket
+      _createNotificationForAdmins(
+        title: 'Tiket Dibuka Kembali',
+        message: 'Tiket #$ticketNo: $title - User me-reopen tiket',
+        ticketId: id,
+        type: 'info',
+      );
+    }
+  }
+
   /// Get ticket history
   Future<List<Map<String, dynamic>>> getTicketHistory(String ticketId) async {
     final response = await _client
