@@ -259,21 +259,80 @@ class TicketRepository {
     );
   }
 
-  /// Assign ticket to user
+  /// Assign ticket to user - automatically changes status to 'in_progress'
   Future<void> assignTicket(String id, String assignTo) async {
+    final userId = _currentUserId;
+    if (userId == null) throw Exception('User not authenticated');
+
     await _client
         .from('tickets')
-        .update({'assigned_to': assignTo})
+        .update({'assigned_to': assignTo, 'status': 'in_progress'})
         .eq('id', id);
+
+    // Add to history
+    await _client.from('ticket_history').insert({
+      'ticket_id': id,
+      'changed_by': userId,
+      'old_status': 'open',
+      'new_status': 'in_progress',
+      'note': 'Tiket ditugaskan ke helpdesk',
+    });
+
+    // Get ticket details for notification
+    final ticket = await _client.from('tickets').select('*').eq('id', id).maybeSingle();
+    final ticketNo = ticket?['ticket_no'] ?? '';
+    final title = ticket?['title'] ?? '';
 
     // Notify assigned user
     await createNotification(
       userId: assignTo,
       title: 'Tiket Ditugaskan',
-      message: 'Anda telah ditugaskan untuk tiket #$id',
+      message: 'Tiket #$ticketNo: $title - Anda telah ditugaskan',
       ticketId: id,
       type: 'info',
     );
+  }
+
+  /// Finish ticket - changes status to 'closed'
+  Future<void> finishTicket(String id) async {
+    final userId = _currentUserId;
+    if (userId == null) throw Exception('User not authenticated');
+
+    // Get current status for history
+    final ticket = await _client.from('tickets').select('status').eq('id', id).single();
+    final oldStatus = ticket['status'] as String? ?? 'in_progress';
+
+    // Update status to closed
+    await _client
+        .from('tickets')
+        .update({'status': 'closed'})
+        .eq('id', id);
+
+    // Add to history
+    await _client.from('ticket_history').insert({
+      'ticket_id': id,
+      'changed_by': userId,
+      'old_status': oldStatus,
+      'new_status': 'closed',
+      'note': 'Pekerjaan selesai',
+    });
+
+    // Get ticket details for notification
+    final ticketDetails = await _client.from('tickets').select('*').eq('id', id).maybeSingle();
+    if (ticketDetails != null) {
+      final ticketNo = ticketDetails['ticket_no'] ?? '';
+      final title = ticketDetails['title'] ?? '';
+      final creatorId = ticketDetails['user_id'];
+
+      // Notify ticket creator
+      await createNotification(
+        userId: creatorId,
+        title: 'Tiket Selesai',
+        message: 'Tiket #$ticketNo: $title - Pekerjaan telah selesai',
+        ticketId: id,
+        type: 'success',
+      );
+    }
   }
 
   /// Get ticket history

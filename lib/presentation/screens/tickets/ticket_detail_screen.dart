@@ -124,37 +124,16 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     }
   }
 
-  Future<void> _updateStatus(String status) async {
+  Future<void> _finishTicket() async {
     final isDark = context.isDark;
-    final noteCtrl = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: isDark ? AppTheme.dark1 : AppTheme.surface0,
-        title: Text('Update ke ${AppTheme.statusLabel(status)}',
+        title: Text('Selesaikan Tiket',
             style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: isDark ? AppTheme.white : AppTheme.black)),
-        content: TextField(
-          controller: noteCtrl,
-          style: TextStyle(color: isDark ? AppTheme.white : AppTheme.black, fontSize: 14),
-          maxLines: 3,
-          decoration: InputDecoration(
-            hintText: 'Catatan (opsional)',
-            filled: true,
-            fillColor: isDark ? AppTheme.dark2 : AppTheme.surface1,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: isDark ? AppTheme.white : AppTheme.black, width: 1),
-            ),
-          ),
-        ),
+        content: Text('Apakah Anda yakin pekerjaan untuk tiket ini sudah selesai?',
+            style: TextStyle(fontSize: 14, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -162,16 +141,31 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Simpan', style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? AppTheme.white : AppTheme.black)),
+            child: Text('Ya, Selesai', style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? AppTheme.white : AppTheme.black)),
           ),
         ],
       ),
     );
     if (ok == true) {
-      await _repo.updateStatus(widget.ticketId, status, noteCtrl.text.trim());
-      await _load();
+      setState(() => _submitting = true);
+      try {
+        await _repo.finishTicket(widget.ticketId);
+        await _load();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Tiket telah diselesaikan'), backgroundColor: Colors.green),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Gagal: $e'), backgroundColor: AppTheme.priorityHigh),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _submitting = false);
+      }
     }
-    noteCtrl.dispose();
   }
 
   @override
@@ -231,6 +225,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               ],
             ],
           ),
+
+          // ── Progress Stepper ───────────────────────────────────────────
+          const SizedBox(height: 20),
+          _TicketStepper(status: t.status, isDark: isDark),
 
           // ── Title ─────────────────────────────────────────────────────
           const SizedBox(height: 16),
@@ -362,7 +360,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                           );
                         }),
                       ],
-                      value: t.assignedTo,
+                      initialValue: t.assignedTo,
                       onChanged: _submitting ? null : (v) => _assignTicket(v),
                     ),
                 ],
@@ -370,39 +368,31 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             ),
           ],
 
-          // ── Status Update (Admin + Helpdesk) ───────────────────────────
-          if (_canManageTickets) ...[
-            if (_isHelpdesk) const SizedBox(height: 16),
-            Text('Update Status', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: ['open', 'in_progress', 'resolved', 'closed'].map((s) {
-                final isCurrent = t.status == s;
-                return GestureDetector(
-                  onTap: isCurrent ? null : () => _updateStatus(s),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isCurrent ? AppTheme.statusColor(s) : AppTheme.statusBgColor(s, isDark: isDark),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: AppTheme.statusColor(s),
-                        width: 0.5,
+          // ── Helpdesk Actions (Finish button) ───────────────────────────────
+          if (_isHelpdesk && t.assignedTo == SupabaseService.client.auth.currentUser?.id && t.status == 'in_progress') ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _submitting ? null : _finishTicket,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                child: _submitting
+                    ? SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.check_circle_outline, size: 18),
+                          const SizedBox(width: 8),
+                          Text('Selesaikan Tiket', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                        ],
                       ),
-                    ),
-                    child: Text(
-                      AppTheme.statusLabel(s),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: isCurrent ? AppTheme.white : AppTheme.statusColor(s),
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
+              ),
             ),
           ],
 
@@ -830,5 +820,140 @@ class _HistoryCard extends StatelessWidget {
     if (diff.inHours < 24) return '${diff.inHours}j lalu';
     if (diff.inDays < 7) return '${diff.inDays}h lalu';
     return '${d.day}/${d.month}/${d.year}';
+  }
+}
+
+// ── Ticket Stepper Widget ───────────────────────────────────────────────────────
+
+class _TicketStepper extends StatelessWidget {
+  final String status;
+  final bool isDark;
+
+  const _TicketStepper({required this.status, required this.isDark});
+
+  int get _currentStep {
+    switch (status) {
+      case 'open': return 0;
+      case 'in_progress': return 1;
+      case 'closed': return 2;
+      default: return 0;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.dark1 : AppTheme.surface0,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _StepItem(
+            label: 'Open',
+            isActive: _currentStep == 0,
+            isCompleted: _currentStep > 0,
+            isDark: isDark,
+          ),
+          _Connector(isCompleted: _currentStep > 0, isDark: isDark),
+          _StepItem(
+            label: 'On Progress',
+            isActive: _currentStep == 1,
+            isCompleted: _currentStep > 1,
+            isDark: isDark,
+          ),
+          _Connector(isCompleted: _currentStep > 1, isDark: isDark),
+          _StepItem(
+            label: 'Closed',
+            isActive: _currentStep == 2,
+            isCompleted: _currentStep > 2,
+            isDark: isDark,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepItem extends StatelessWidget {
+  final String label;
+  final bool isActive;
+  final bool isCompleted;
+  final bool isDark;
+
+  const _StepItem({
+    required this.label,
+    required this.isActive,
+    required this.isCompleted,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Color getColor() {
+      if (isCompleted) return Colors.green;
+      if (isActive) return isDark ? AppTheme.white : AppTheme.black;
+      return isDark ? AppTheme.dark3 : AppTheme.surface2;
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: getColor(),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: isCompleted
+                ? Icon(Icons.check, size: 16, color: Colors.white)
+                : isActive
+                    ? Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: isDark ? AppTheme.black : AppTheme.white,
+                          shape: BoxShape.circle,
+                        ),
+                      )
+                    : null,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+            color: getColor(),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Connector extends StatelessWidget {
+  final bool isCompleted;
+  final bool isDark;
+
+  const _Connector({required this.isCompleted, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8),
+        height: 2,
+        decoration: BoxDecoration(
+          color: isCompleted ? Colors.green : (isDark ? AppTheme.dark3 : AppTheme.surface2),
+        ),
+      ),
+    );
   }
 }
