@@ -176,7 +176,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 size: 18,
                 color: isDark ? AppTheme.black : AppTheme.white,
               ),
-              onPressed: () => context.pop(),
+              onPressed: () => context.go('/dashboard'),
             ),
             flexibleSpace: FlexibleSpaceBar(
               background: Container(

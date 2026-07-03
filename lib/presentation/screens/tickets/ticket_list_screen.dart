@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/ticket_model.dart';
 import '../../../data/providers/providers.dart';
+import '../../widgets/common/app_transitions.dart';
 
 class TicketListScreen extends ConsumerStatefulWidget {
   const TicketListScreen({super.key});
@@ -77,7 +78,7 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
         ),
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_rounded, size: 18, color: isDark ? AppTheme.white : AppTheme.black),
-          onPressed: () => context.pop(),
+          onPressed: () => context.go('/dashboard'),
         ),
         actions: [
           IconButton(
@@ -133,12 +134,15 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
                         child: ListView.builder(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
                           itemCount: list.length,
-                          itemBuilder: (_, i) => Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: _TicketCard(
-                              ticket: list[i],
-                              isDark: isDark,
-                              onTap: () => context.push('/tickets/${list[i].id}'),
+                          itemBuilder: (_, i) => ListItemTransition(
+                            index: i,
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: _TicketCard(
+                                ticket: list[i],
+                                isDark: isDark,
+                                onTap: () => context.push('/tickets/${list[i].id}'),
+                              ),
                             ),
                           ),
                         ),

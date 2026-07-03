@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../data/models/ticket_model.dart';
 import '../../../data/repositories/ticket_repository.dart';
+import '../../widgets/common/app_toast.dart';
 
 class TicketDetailScreen extends StatefulWidget {
   final String ticketId;
@@ -95,7 +96,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       await _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal: $e')));
+        context.showError('Gagal: $e');
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -109,15 +110,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       await _repo.assignTicket(widget.ticketId, helpdeskId);
       await _load();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tiket berhasil di-assign'), backgroundColor: AppTheme.statusResolved),
-        );
+        context.showSuccess('Tiket berhasil di-assign');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal assign: $e'), backgroundColor: AppTheme.priorityHigh),
-        );
+        context.showError('Gagal assign: $e');
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -152,15 +149,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         await _repo.finishTicket(widget.ticketId);
         await _load();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Tiket telah diselesaikan'), backgroundColor: Colors.green),
-          );
+          context.showSuccess('Tiket telah diselesaikan');
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Gagal: $e'), backgroundColor: AppTheme.priorityHigh),
-          );
+          context.showError('Gagal: $e');
         }
       } finally {
         if (mounted) setState(() => _submitting = false);
@@ -215,9 +208,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           TextButton(
             onPressed: () {
               if (reasonCtrl.text.trim().isEmpty) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  SnackBar(content: Text('Alasan harus diisi'), backgroundColor: Colors.red),
-                );
+                ctx.showError('Alasan harus diisi');
                 return;
               }
               Navigator.pop(ctx, true);
@@ -233,15 +224,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         await _repo.reopenTicket(widget.ticketId, reasonCtrl.text.trim());
         await _load();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Tiket berhasil dibuka kembali'), backgroundColor: Colors.orange),
-          );
+          context.showSuccess('Tiket berhasil dibuka kembali');
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Gagal: $e'), backgroundColor: AppTheme.priorityHigh),
-          );
+          context.showError('Gagal: $e');
         }
       } finally {
         if (mounted) setState(() => _submitting = false);

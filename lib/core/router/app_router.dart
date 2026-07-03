@@ -41,7 +41,6 @@ final appRouter = GoRouter(
     GoRoute(path: '/reset-password', builder: (_, __) => const ResetPasswordScreen()),
     GoRoute(path: '/dashboard', builder: (_, __) => const DashboardScreen()),
     GoRoute(path: '/tickets', builder: (_, __) => const TicketListScreen()),
-    // IMPORTANT: /tickets/create must be before /tickets/:id
     GoRoute(path: '/tickets/create', builder: (_, __) => const CreateTicketScreen()),
     GoRoute(
       path: '/tickets/:id',

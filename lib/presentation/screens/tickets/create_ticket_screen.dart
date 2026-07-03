@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../data/repositories/ticket_repository.dart';
+import '../../widgets/common/app_toast.dart';
 
 class CreateTicketScreen extends StatefulWidget {
   const CreateTicketScreen({super.key});
@@ -95,34 +96,23 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
               );
             } catch (uploadError) {
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Upload gagal: $uploadError'),
-                    backgroundColor: Colors.red,
-                    duration: Duration(seconds: 5),
-                  ),
-                );
+                context.showError('Upload gagal: $uploadError');
               }
             }
           } catch (e) {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Gagal upload gambar: $e'),
-                  backgroundColor: Colors.red,
-                ),
-              );
+              context.showError('Gagal upload gambar: $e');
             }
           }
         }
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tiket berhasil dibuat')));
+        context.showSuccess('Tiket berhasil dibuat');
         context.pop();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal: $e')));
+        context.showError('Gagal: $e');
       }
     } finally {
       if (mounted) setState(() => _loading = false);

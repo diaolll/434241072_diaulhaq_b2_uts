@@ -14,9 +14,18 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  int _tab = 0;
   int _statsTab = 0; // 0 = Kategori, 1 = Prioritas, 2 = Role, 3 = Aktivitas
   String? _userRole;
+
+  // Compute current tab from router location (always synced!)
+  int get _currentTab {
+    final loc = GoRouterState.of(context).matchedLocation;
+    if (loc.startsWith('/dashboard')) return 0;
+    if (loc.startsWith('/tickets')) return 1;
+    if (loc.startsWith('/notifications')) return 2;
+    if (loc.startsWith('/profile')) return 3;
+    return 0;
+  }
 
   @override
   void initState() {
@@ -270,13 +279,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
       ),
       bottomNavigationBar: _BottomBar(
-        current: _tab,
+        current: _currentTab,
         onChanged: (i) {
-          setState(() => _tab = i);
+          // Just navigate, tab will auto-sync from location
           switch (i) {
-            case 1: context.push('/tickets'); break;
-            case 2: context.push('/notifications'); break;
-            case 3: context.push('/profile'); break;
+            case 0: context.go('/dashboard'); break;
+            case 1: context.go('/tickets'); break;
+            case 2: context.go('/notifications'); break;
+            case 3: context.go('/profile'); break;
           }
         },
         isDark: isDark,
