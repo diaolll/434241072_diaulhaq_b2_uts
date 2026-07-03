@@ -757,7 +757,7 @@ class _UserBottomNav extends StatelessWidget {
                   height: 44,
                   decoration: BoxDecoration(
                     color: isDark ? AppTheme.white : AppTheme.black,
-                    borderRadius: BorderRadius.circular(12),
+                    shape: BoxShape.circle,
                   ),
                   child: Icon(Icons.add_rounded, size: 22, color: isDark ? AppTheme.black : AppTheme.white),
                 ),
