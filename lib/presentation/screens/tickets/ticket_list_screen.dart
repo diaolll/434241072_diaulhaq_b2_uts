@@ -105,16 +105,21 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
             ),
           ),
 
-          // Filter Panel
-          if (_showFilter)
-            _FilterPanel(
-              isDark: isDark,
-              filterStatus: _filterStatus,
-              filterPriority: _filterPriority,
-              onStatusChanged: (v) => setState(() => _filterStatus = v),
-              onPriorityChanged: (v) => setState(() => _filterPriority = v),
-              onReset: () => setState(() { _filterStatus = null; _filterPriority = null; }),
-            ),
+          // Filter Panel with smooth animation
+          AnimatedSize(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            child: _showFilter
+                ? _FilterPanel(
+                    isDark: isDark,
+                    filterStatus: _filterStatus,
+                    filterPriority: _filterPriority,
+                    onStatusChanged: (v) => setState(() => _filterStatus = v),
+                    onPriorityChanged: (v) => setState(() => _filterPriority = v),
+                    onReset: () => setState(() { _filterStatus = null; _filterPriority = null; }),
+                  )
+                : const SizedBox.shrink(),
+          ),
 
           // List
           Expanded(
@@ -270,82 +275,167 @@ class _FilterPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      color: isDark ? AppTheme.dark1 : AppTheme.surface0,
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.dark1 : AppTheme.surface0,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? AppTheme.dark3 : AppTheme.surface2, width: 0.5),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Filter', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: isDark ? AppTheme.white : AppTheme.black)),
+              Text('Filter', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: isDark ? AppTheme.white : AppTheme.black)),
               GestureDetector(
                 onTap: onReset,
-                child: Text('Reset', style: TextStyle(fontSize: 12, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.dark2 : AppTheme.surface1,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text('Reset', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 16),
+          // Status Chips
+          Text('Status', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
+          const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: ['open', 'in_progress', 'resolved', 'closed'].map((s) {
+            children: ['open', 'in_progress', 'closed'].map((s) {
               final sel = filterStatus == s;
-              return GestureDetector(
+              return _FilterChip(
+                label: AppTheme.statusLabel(s),
+                isSelected: sel,
+                selectedColor: AppTheme.statusColor(s),
+                isDark: isDark,
                 onTap: () => onStatusChanged(sel ? null : s),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: sel ? AppTheme.statusColor(s) : (isDark ? AppTheme.dark2 : AppTheme.surface1),
-                    borderRadius: BorderRadius.circular(7),
-                    border: Border.all(
-                      color: sel ? AppTheme.statusColor(s) : (isDark ? AppTheme.dark3 : AppTheme.surface2),
-                      width: 0.5,
-                    ),
-                  ),
-                  child: Text(
-                    AppTheme.statusLabel(s),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: sel ? AppTheme.white : (isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
-                    ),
-                  ),
-                ),
               );
             }).toList(),
           ),
+          const SizedBox(height: 16),
+          // Priority Chips
+          Text('Prioritas', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: ['low', 'medium', 'high', 'critical'].map((p) {
               final sel = filterPriority == p;
-              return GestureDetector(
+              return _FilterChip(
+                label: AppTheme.priorityLabel(p),
+                isSelected: sel,
+                selectedColor: AppTheme.priorityColor(p),
+                isDark: isDark,
                 onTap: () => onPriorityChanged(sel ? null : p),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: sel ? AppTheme.priorityColor(p) : (isDark ? AppTheme.dark2 : AppTheme.surface1),
-                    borderRadius: BorderRadius.circular(7),
-                    border: Border.all(
-                      color: sel ? AppTheme.priorityColor(p) : (isDark ? AppTheme.dark3 : AppTheme.surface2),
-                      width: 0.5,
-                    ),
-                  ),
-                  child: Text(
-                    AppTheme.priorityLabel(p),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: sel ? AppTheme.white : (isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
-                    ),
-                  ),
-                ),
               );
             }).toList(),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Animated Filter Chip ────────────────────────────────────────────────────────
+
+class _FilterChip extends StatefulWidget {
+  final String label;
+  final bool isSelected;
+  final Color selectedColor;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _FilterChip({
+    required this.label,
+    required this.isSelected,
+    required this.selectedColor,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  State<_FilterChip> createState() => _FilterChipState();
+}
+
+class _FilterChipState extends State<_FilterChip> with SingleTickerProviderStateMixin {
+  late AnimationController _scaleController;
+  late Animation<double> _scaleAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _scaleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+    _scaleAnim = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _scaleController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _scaleController.dispose();
+    super.dispose();
+  }
+
+  void _handleTap() {
+    _scaleController.forward().then((_) {
+      _scaleController.reverse();
+    });
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _handleTap,
+      child: ScaleTransition(
+        scale: _scaleAnim,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: widget.isSelected
+                ? widget.selectedColor
+                : (widget.isDark ? AppTheme.dark2 : AppTheme.surface1),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: widget.isSelected
+                  ? widget.selectedColor
+                  : (widget.isDark ? AppTheme.dark3 : AppTheme.surface2),
+              width: widget.isSelected ? 1 : 0.5,
+            ),
+            boxShadow: widget.isSelected
+                ? [
+                    BoxShadow(
+                      color: widget.selectedColor.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: widget.isSelected
+                  ? AppTheme.white
+                  : (widget.isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondary),
+            ),
+          ),
+        ),
       ),
     );
   }

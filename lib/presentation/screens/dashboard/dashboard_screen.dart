@@ -344,11 +344,11 @@ class _StatsRow extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _StatCard(
-                label: 'Resolved',
-                value: '${stats['resolved'] ?? 0}',
+                label: 'Closed',
+                value: '${stats['closed'] ?? 0}',
                 isDark: isDark,
-                accent: AppTheme.statusResolved,
-                bg: AppTheme.statusResolvedBg,
+                accent: AppTheme.statusClosed,
+                bg: AppTheme.statusClosedBg,
               ),
             ),
           ],
@@ -434,7 +434,7 @@ class _ChartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = (stats['open'] ?? 0) + (stats['in_progress'] ?? 0) + (stats['resolved'] ?? 0) + (stats['closed'] ?? 0);
+    final total = (stats['open'] ?? 0) + (stats['in_progress'] ?? 0) + (stats['closed'] ?? 0);
     if (total == 0) return const SizedBox.shrink();
 
     return Container(
@@ -480,13 +480,6 @@ class _ChartCard extends StatelessWidget {
                             radius: 52,
                             title: '',
                           ),
-                        if ((stats['resolved'] ?? 0) > 0)
-                          PieChartSectionData(
-                            value: (stats['resolved'] ?? 0).toDouble(),
-                            color: AppTheme.statusResolved,
-                            radius: 52,
-                            title: '',
-                          ),
                         if ((stats['closed'] ?? 0) > 0)
                           PieChartSectionData(
                             value: (stats['closed'] ?? 0).toDouble(),
@@ -505,7 +498,6 @@ class _ChartCard extends StatelessWidget {
                   children: [
                     if ((stats['open'] ?? 0) > 0) _Dot('Open', AppTheme.statusOpen, stats['open']!),
                     if ((stats['in_progress'] ?? 0) > 0) _Dot('In Progress', AppTheme.statusInProgress, stats['in_progress']!),
-                    if ((stats['resolved'] ?? 0) > 0) _Dot('Resolved', AppTheme.statusResolved, stats['resolved']!),
                     if ((stats['closed'] ?? 0) > 0) _Dot('Closed', AppTheme.statusClosed, stats['closed']!),
                   ],
                 ),
@@ -583,9 +575,8 @@ class _TicketRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(9),
               ),
               child: Icon(
-                status == 'resolved' ? Icons.check_rounded
+                status == 'closed' ? Icons.check_rounded
                     : status == 'in_progress' ? Icons.pending_rounded
-                    : status == 'closed' ? Icons.lock_outline_rounded
                     : Icons.inbox_rounded,
                 size: 18,
                 color: AppTheme.statusColor(status),
