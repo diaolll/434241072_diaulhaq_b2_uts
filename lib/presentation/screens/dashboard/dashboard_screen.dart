@@ -1194,7 +1194,7 @@ class _AdminStatsList extends StatelessWidget {
   }
 }
 
-// ── Stat Item Widget ─────────────────────────────────────────────────────────────
+// ── Stat Item Widgett ─────────────────────────────────────────────────────────────
 
 class _StatItem extends StatelessWidget {
   final String label;
