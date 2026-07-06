@@ -57,17 +57,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Logo
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: isDark ? AppTheme.white : AppTheme.black,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.support_agent_rounded,
-                    size: 24,
-                    color: isDark ? AppTheme.black : AppTheme.white,
+                Transform.translate(
+                  offset: const Offset(0, 0),
+                  child: Image.asset(
+                    'assets/logo/app_logo_foreground.png',
+                    width: 72,
+                    height: 72,
                   ),
                 ),
                 const SizedBox(height: 32),
